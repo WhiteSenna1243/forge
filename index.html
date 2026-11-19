@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0c">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="FORGE: track calories, hit your macros, and plan meals from the UNC Charlotte dining halls.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FORGE">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>FORGE</title>
+<style>
+:root {
+  --bg: #0b0b0c; --s1: #141416; --s2: #1c1c1f; --line: #2a2a2f; --ink: #f4f2ee; --muted: #a3a1a8; --faint: #8c8a93;
+  --ember: #ff5a1f; --ember-2: #ff8a3d; --ember-ink: #120a06; --ok: #3ddc84; --over: #ff3b3b;
+  --pro: #ff5a1f; --carb: #ffb020; --fat: #4cc9f0;
+  --r: 18px; --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; --body: Barlow, system-ui, -apple-system, sans-serif;
+  --tabbar: 68px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--body); min-height: 100dvh;
+  padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px); overflow-x: hidden; }
+body::before { content: ""; position: fixed; inset: -20% -10% auto; height: 420px; pointer-events: none; z-index: 0;
+  background: radial-gradient(60% 60% at 70% 0%, rgba(255, 90, 31, .16), transparent 70%); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+/* ---------- header ---------- */
+header { position: sticky; top: 0; z-index: 10; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  background: rgba(11, 11, 12, .82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.04); }
+.bar { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 8px; font: italic 800 26px/1 var(--display); letter-spacing: 1.5px; margin: 0; }
+.brand svg { width: 26px; height: 26px; }
+.datepill { margin-left: auto; display: flex; align-items: center; background: var(--s1); border: 1px solid var(--line); border-radius: 999px; }
+.datepill button { background: none; border: 0; width: 38px; height: 36px; display: grid; place-items: center; color: var(--muted); cursor: pointer; border-radius: 999px; }
+.datepill button:hover { color: var(--ink); }
+.datepill strong { font: 700 15px var(--display); letter-spacing: 1px; text-transform: uppercase; min-width: 74px; text-align: center; }
+
+main { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; padding: 16px; }
+section[data-tab] { display: none; animation: rise .25s ease-out; }
+section[data-tab].on { display: block; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { section[data-tab] { animation: none; } }
+
+/* ---------- type & surfaces ---------- */
+.eyebrow { font: 700 13px var(--display); letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+h2 { font: 800 24px/1.05 var(--display); letter-spacing: .5px; text-transform: uppercase; margin: 0 0 12px; }
+.card { background: var(--s1); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 12px; }
+.muted { color: var(--muted); font-size: 14px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+.num { font-family: var(--display); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--s2); cursor: pointer; font: 700 15px var(--display); letter-spacing: 1px; text-transform: uppercase; text-decoration: none; color: var(--ink); }
+.btn:hover { border-color: #3a3a40; }
+.btn.hot { background: linear-gradient(180deg, var(--ember-2), var(--ember)); color: var(--ember-ink); border: 0; box-shadow: 0 2px 0 #b8380c inset, 0 4px 12px rgba(0, 0, 0, .35); }
+.btn.hot:hover { filter: brightness(1.06); }
+.btn.ghost { background: none; }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: 11px; }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .45; cursor: default; }
+.iconbtn { background: none; border: 0; color: var(--faint); width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; cursor: pointer; flex: none; }
+.iconbtn:hover { color: var(--ink); background: var(--s2); }
+
+label { display: block; font: 700 12px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+input, select, textarea { width: 100%; margin-top: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px;
+  font: 500 16px var(--body); letter-spacing: 0; text-transform: none; color: var(--ink); min-height: 44px; }
+input:focus, select:focus, textarea:focus { border-color: var(--ember); outline: none; }
+select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23a3a1a8' stroke-width='2'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+textarea { min-height: 96px; resize: vertical; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 8px; }
+.check { display: flex; align-items: center; gap: 10px; font: 500 15px var(--body); letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0; cursor: pointer; }
+.check input { width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--ember); }
+
+/* ---------- diary hero ---------- */
+.hero { display: grid; grid-template-columns: 150px 1fr; gap: 18px; align-items: center; padding: 18px; }
+.gauge { position: relative; width: 150px; height: 150px; }
+.gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.gauge .track { stroke: var(--s2); }
+.gauge .fill { stroke: url(#emberGrad); transition: stroke-dashoffset .6s cubic-bezier(.2, .8, .2, 1); }
+.gauge.over .fill { stroke: var(--over); }
+.gauge .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.gauge .big { font: 800 44px/0.9 var(--display); letter-spacing: .5px; }
+.gauge .lbl { font: 700 11px var(--display); letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.macro { margin-bottom: 12px; }
+.macro:last-child { margin-bottom: 0; }
+.macro .top { display: flex; justify-content: space-between; align-items: baseline; font: 700 13px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.macro .top b { color: var(--ink); font-size: 17px; letter-spacing: .3px; }
+.macro .top small { color: var(--faint); font-size: 13px; }
+.track-bar { height: 8px; background: var(--s2); border-radius: 99px; overflow: hidden; margin-top: 5px; }
+.track-bar i { display: block; height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+.eaten { display: flex; gap: 8px; margin-top: 4px; }
+.eaten div { flex: 1; background: var(--s1); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.eaten span { display: block; font: 700 11px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.eaten b { font: 800 22px var(--display); }
+@media (max-width: 380px) { .hero { grid-template-columns: 1fr; justify-items: center; } .hero .macros { width: 100%; } }
+
+/* ---------- meals & food rows ---------- */
+.meal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.meal-head h3 { margin: 0; font: 800 20px var(--display); letter-spacing: 1px; text-transform: uppercase; }
+.meal-head .num { color: var(--muted); font-size: 18px; }
+.entry { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.entry .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry .sub { font-size: 13px; color: var(--muted); }
+.entry .kcal { font: 800 20px var(--display); white-space: nowrap; }
+.entry .kcal small { font-size: 12px; color: var(--muted); font-weight: 700; margin-left: 2px; }
+.empty-note { color: var(--faint); font-size: 14px; padding: 4px 0 2px; }
+.badge { display: inline-block; font: 700 10px var(--display); letter-spacing: 1px; padding: 2px 6px; border-radius: 6px; background: var(--s2); color: var(--muted); vertical-align: 1px; margin-left: 4px; text-transform: uppercase; }
+.badge.v { color: var(--ok); }
+.food { cursor: pointer; border-radius: 12px; margin: 0 -8px; padding: 10px 8px; border-top-color: transparent; box-shadow: inset 0 1px 0 var(--line); }
+.food:hover { background: var(--s2); }
+.station { font: 700 12px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--ember); margin: 18px 0 2px; }
+.station:first-child { margin-top: 4px; }
+.station span { color: var(--faint); }
+
+/* ---------- campus ---------- */
+.search { position: relative; }
+.search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--faint); margin-top: 3px; }
+.search input { padding-left: 38px; }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 10px 0 0; }
+.steps li { counter-increment: s; position: relative; padding-left: 40px; margin-bottom: 14px; color: var(--muted); font-size: 15px; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 28px; height: 28px; border-radius: 9px; background: var(--s2);
+  display: grid; place-items: center; font: 800 15px var(--display); color: var(--ember); }
+.steps strong { color: var(--ink); }
+.bm { display: inline-flex; align-items: center; gap: 6px; background: var(--s2); border: 1px dashed var(--ember); color: var(--ink); font: 800 14px var(--display);
+  letter-spacing: 1px; text-transform: uppercase; padding: 8px 12px; border-radius: 10px; text-decoration: none; cursor: grab; margin-top: 6px; }
+.seg { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 3px; margin: 4px 0 14px; }
+.seg button { flex: 1; border: 0; background: none; padding: 8px; border-radius: 9px; font: 700 13px var(--display); letter-spacing: 1px; text-transform: uppercase; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--s2); color: var(--ink); }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 6px; vertical-align: 1px; }
+.status-dot.live { background: var(--ok); }
+details summary { cursor: pointer; list-style: none; font: 700 14px var(--display); letter-spacing: 1px; text-transform: uppercase; color: var(--ember); }
+details summary::-webkit-details-marker { display: none; }
+
+/* ---------- coach ---------- */
+.coach-input { position: relative; }
+.coach-input textarea { padding-right: 70px; min-height: 110px; font-size: 17px; }
+.mic { position: absolute; right: 10px; bottom: 10px; width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+  background: linear-gradient(180deg, var(--ember-2), var(--ember)); color: var(--ember-ink); box-shadow: 0 4px 12px rgba(0, 0, 0, .4); }
+.mic.live { animation: pulse 1.2s infinite; background: var(--over); color: #fff; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 59, .55); } 100% { box-shadow: 0 0 0 18px rgba(255, 59, 59, 0); } }
+@media (prefers-reduced-motion: reduce) { .mic.live { animation: none; } }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; scrollbar-width: none; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--line); background: var(--s2); color: var(--muted); border-radius: 999px; padding: 8px 14px; font: 500 14px var(--body); cursor: pointer; white-space: nowrap; }
+.chip:hover { color: var(--ink); border-color: #3a3a40; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+.stat { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; }
+.stat b { display: block; font: 800 24px/1 var(--display); }
+.stat span { font: 700 11px var(--display); letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
+.stat.kcal b { color: var(--ember); }
+.sugg { background: var(--bg); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px 10px; margin-bottom: 10px; }
+.sugg .where { font: 700 12px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--ember); }
+.sugg h3 { margin: 2px 0 2px; font: 800 20px var(--display); text-transform: uppercase; letter-spacing: 1px; }
+.tips { margin: 0; padding: 0; list-style: none; }
+.tips li { position: relative; padding: 0 0 10px 18px; color: var(--muted); font-size: 15px; }
+.tips li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 7px; border-radius: 2px; background: var(--ember); transform: rotate(45deg); }
+.err { color: var(--over); font-size: 14px; margin-top: 8px; min-height: 0; }
+
+/* ---------- tab bar ---------- */
+nav.tabs { position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; padding: 0 12px env(safe-area-inset-bottom);
+  background: rgba(14, 14, 16, .9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid var(--line); }
+nav.tabs .inner { max-width: 640px; margin: 0 auto; display: flex; height: var(--tabbar); }
+nav.tabs button { flex: 1; border: 0; background: none; color: var(--faint); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  font: 700 11px var(--display); letter-spacing: 1.5px; text-transform: uppercase; position: relative; }
+nav.tabs button svg { width: 24px; height: 24px; }
+nav.tabs button.on { color: var(--ink); }
+nav.tabs button.on svg { color: var(--ember); }
+nav.tabs button.on::before { content: ""; position: absolute; top: 0; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: var(--ember); }
+
+/* ---------- sheet ---------- */
+dialog { border: 1px solid var(--line); background: var(--s1); color: var(--ink); padding: 18px 16px calc(16px + env(safe-area-inset-bottom)); width: 100%; max-width: 520px;
+  margin: auto auto 0; border-radius: 22px 22px 0 0; max-height: 92dvh; overflow-y: auto; }
+dialog::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
+dialog[open] { animation: sheet .22s ease-out; }
+@keyframes sheet { from { transform: translateY(30px); opacity: 0; } }
+@media (min-width: 600px) { dialog { margin: auto; border-radius: 22px; } }
+.grabber { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: -6px auto 12px; }
+#toast { position: fixed; z-index: 20; left: 50%; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 14px); transform: translate(-50%, 10px); background: var(--ink); color: var(--bg);
+  font: 600 15px var(--body); padding: 11px 18px; border-radius: 14px; opacity: 0; pointer-events: none; transition: .2s; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+.hidden { display: none !important; }
+/* Netlify's free-plan badge sits in the bottom-right corner; lift the tab bar above it instead of hiding it. */
+body.host-badge { --badge: 66px; padding-bottom: calc(var(--tabbar) + var(--badge) + env(safe-area-inset-bottom) + 12px); }
+body.host-badge nav.tabs { bottom: var(--badge); border-bottom: 1px solid var(--line); }
+body.host-badge::after { content: ""; position: fixed; z-index: 9; left: 0; right: 0; bottom: 0; height: var(--badge); background: var(--bg); }
+body.host-badge #toast { bottom: calc(var(--tabbar) + var(--badge) + env(safe-area-inset-bottom) + 14px); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="emberGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb020"/><stop offset=".55" stop-color="#ff7a2a"/><stop offset="1" stop-color="#ff3d1f"/></linearGradient>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path fill="url(#emberGrad)" d="M12.6 1.8c.6 3.3-1 5.2-2.6 7-1.4 1.6-2.7 3.1-2.3 5.6.3 1.8 1.5 3 2.9 3.4-.6-1.9.1-3.4 1.4-4.7.5 2.3 2 3.1 3 4.6.4-.7.6-1.5.6-2.4 1.6 1.4 2 3.4 1.4 5.2C20 19.3 21 16.9 21 14.4c0-5.6-4.6-8.3-5.8-11.5-.9 1-1.1 2.3-1 3.7-.6-1.8-.9-3.4-1.6-4.8z"/><path fill="#ff3d1f" d="M8.2 10.6C6.3 12.3 5 14.1 5 16.5 5 19.6 7.5 22 10.6 22.2c-2.2-1-3.5-3.3-3.2-5.8.2-2.1 1.3-3.5.8-5.8z" opacity=".75"/></symbol>
+    <symbol id="i-diary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h13"/><path d="M9 8h6M9 12h4"/></symbol>
+    <symbol id="i-campus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v20M4 2v5a3 3 0 0 0 6 0V2M17 22V2c-2.5 1-4 4-4 8 0 2 1 3 4 3"/></symbol>
+    <symbol id="i-coach" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  </defs>
+</svg>
+
+<header>
+  <div class="bar">
+    <h1 class="brand"><svg aria-hidden="true"><use href="#i-flame"/></svg>FORGE</h1>
+    <div class="datepill">
+      <button id="prevDay" aria-label="Previous day"><svg width="18" height="18"><use href="#i-left"/></svg></button>
+      <strong id="dayLabel">Today</strong>
+      <button id="nextDay" aria-label="Next day"><svg width="18" height="18"><use href="#i-right"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- DIARY -->
+  <section data-tab="diary" class="on">
+    <div class="card hero">
+      <div class="gauge" id="gauge">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
+          <circle class="fill" id="gaugeFill" cx="60" cy="60" r="52" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="center"><div class="big num" id="remaining">0</div><div class="lbl" id="remainingLbl">kcal left</div></div>
+      </div>
+      <div class="macros" id="macros"></div>
+    </div>
+    <div class="eaten">
+      <div><span>Goal</span><b class="num" id="goalK">0</b></div>
+      <div><span>Eaten</span><b class="num" id="eatenK">0</b></div>
+      <div><span>Protein left</span><b class="num" id="proK">0g</b></div>
+    </div>
+    <div id="meals" style="margin-top:12px"></div>
+  </section>
+
+  <!-- CAMPUS -->
+  <section data-tab="campus">
+    <p class="eyebrow">UNC Charlotte dining</p>
+    <h2>Campus menus</h2>
+    <div class="card">
+      <div class="row between">
+        <div class="muted grow" id="menuStatus"></div>
+        <button class="btn sm" id="pasteBtn">Paste menu</button>
+      </div>
+      <div id="pasteBox" class="hidden" style="margin-top:12px">
+        <textarea id="pasteText" placeholder="Paste the copied menu here"></textarea>
+        <button class="btn hot block" id="pasteImport" style="margin-top:8px">Import</button>
+      </div>
+      <details id="importHelp" style="margin-top:12px">
+        <summary>How to load today's menus</summary>
+        <div class="seg" role="tablist" aria-label="Device">
+          <button class="on" data-dev="desktop" role="tab">Computer</button>
+          <button data-dev="iphone" role="tab">iPhone</button>
+          <button data-dev="android" role="tab">Android</button>
+        </div>
+        <ol class="steps" data-help="desktop">
+          <li>Drag this to your bookmarks bar:<br><a class="bm" id="bookmarklet" href="#"><svg width="16" height="16"><use href="#i-flame"/></svg>FORGE import</a></li>
+          <li>Open <a href="https://dineoncampus.com/unccharlotte/whats-on-the-menu" target="_blank" rel="noopener" style="color:var(--ink)">Dine On Campus · UNC Charlotte</a>.</li>
+          <li>Click the <strong>FORGE import</strong> bookmark, wait about 40 seconds, then click <strong>Send to FORGE</strong>.</li>
+        </ol>
+        <ol class="steps hidden" data-help="iphone">
+          <li>Tap <button class="btn sm copybm" style="vertical-align:middle">Copy import code</button></li>
+          <li>In Safari, bookmark any page (share button → <strong>Add Bookmark</strong>), name it <strong>FORGE import</strong>.</li>
+          <li>Open Bookmarks, tap <strong>Edit</strong>, tap FORGE import, and replace its address with the copied code.</li>
+          <li>Open <a href="https://dineoncampus.com/unccharlotte/whats-on-the-menu" target="_blank" rel="noopener" style="color:var(--ink)">Dine On Campus</a> in Safari, tap Bookmarks → <strong>FORGE import</strong>.</li>
+          <li>When it's done, tap <strong>Copy</strong>, come back here and tap <strong>Paste menu</strong>.</li>
+        </ol>
+        <ol class="steps hidden" data-help="android">
+          <li>Tap <button class="btn sm copybm" style="vertical-align:middle">Copy import code</button></li>
+          <li>In Chrome, bookmark any page (⋮ → ☆), then edit it: name <strong>FORGE import</strong>, URL = paste the code.</li>
+          <li>Open <a href="https://dineoncampus.com/unccharlotte/whats-on-the-menu" target="_blank" rel="noopener" style="color:var(--ink)">Dine On Campus</a>, tap the address bar, type <strong>FORGE import</strong> and tap the bookmark.</li>
+          <li>When it's done, tap <strong>Copy</strong>, come back here and tap <strong>Paste menu</strong>.</li>
+        </ol>
+      </details>
+    </div>
+    <div id="menuCard" class="hidden">
+      <div class="grid2">
+        <label>Location<select id="locFilter"></select></label>
+        <label>Meal<select id="periodFilter"></select></label>
+      </div>
+      <div class="search"><svg width="18" height="18"><use href="#i-search"/></svg><input id="menuSearch" type="search" placeholder="Search: chicken, salad, pizza…" aria-label="Search menu"></div>
+      <div class="card" style="margin-top:12px" id="menuList"></div>
+    </div>
+  </section>
+
+  <!-- COACH -->
+  <section data-tab="coach">
+    <p class="eyebrow">Your coach</p>
+    <h2>What's the goal?</h2>
+    <div class="coach-input">
+      <textarea id="goalText" placeholder="Say it or type it. Diets, allergies and foods you hate all count." aria-label="Your goal"></textarea>
+      <button class="mic" id="micBtn" aria-label="Speak your goal" aria-pressed="false"><svg width="24" height="24"><use href="#i-mic"/></svg></button>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip">Lose 10 lb by spring break</button>
+      <button class="chip">150g protein, what's for dinner?</button>
+      <button class="chip">Bulk 5 lb in 2 months</button>
+      <button class="chip">Vegetarian, hate mushrooms</button>
+      <button class="chip">Gluten allergy, lunch ideas</button>
+    </div>
+    <div class="row between" style="margin-bottom:6px">
+      <label class="check"><input type="checkbox" id="useCampus"> Use today's campus menu</label>
+      <button class="btn hot" id="askBtn">Build plan</button>
+    </div>
+    <div id="coachErr" class="err" role="alert"></div>
+    <div id="coachResult" style="margin-top:14px"></div>
+  </section>
+
+  <!-- PROFILE -->
+  <section data-tab="profile">
+    <p class="eyebrow" id="profileEyebrow">You</p>
+    <h2 id="profileTitle">Profile</h2>
+    <div class="card">
+      <form id="profileForm">
+        <div class="grid2">
+          <label>Sex<select name="sex"><option value="male">Male</option><option value="female">Female</option></select></label>
+          <label>Age<input name="age" type="number" inputmode="numeric" min="13" max="100" required></label>
+          <label>Height ft<input name="ft" type="number" inputmode="numeric" min="3" max="8" required></label>
+          <label>Height in<input name="inch" type="number" inputmode="numeric" min="0" max="11" required></label>
+          <label>Weight lb<input name="weightLb" type="number" inputmode="decimal" min="60" max="600" step="0.1" required></label>
+          <label>Activity<select name="activity">
+            <option value="sedentary">Mostly sitting</option><option value="light">1-3 workouts/wk</option>
+            <option value="moderate">3-5 workouts/wk</option><option value="active">6-7 workouts/wk</option><option value="athlete">Athlete</option>
+          </select></label>
+          <label>Goal<select name="goal"><option value="lose">Cut (lose)</option><option value="maintain">Maintain</option><option value="gain">Bulk (gain)</option></select></label>
+          <label>Calorie goal<input name="calorieGoal" type="number" inputmode="numeric" min="0" max="10000" placeholder="Auto"></label>
+        </div>
+        <div class="stats" id="targetStats" style="margin-top:0"></div>
+        <button class="btn hot block" type="submit">Save</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3 class="eyebrow" style="margin-bottom:4px">Your data</h3>
+      <p class="muted" style="margin-top:0">Saved only on this device. Nobody else, including whoever shared this app with you, can see it. Export a backup now and then.</p>
+      <div class="row"><button class="btn sm" id="exportBtn">Export backup</button><label class="btn sm" style="margin:0">Import backup<input type="file" id="importFile" accept="application/json" hidden></label></div>
+    </div>
+    <p class="muted" style="text-align:center;margin-top:18px" id="installHint"></p>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="inner">
+    <button data-go="diary" class="on"><svg><use href="#i-diary"/></svg>Diary</button>
+    <button data-go="campus"><svg><use href="#i-campus"/></svg>Campus</button>
+    <button data-go="coach"><svg><use href="#i-coach"/></svg>Coach</button>
+    <button data-go="profile"><svg><use href="#i-user"/></svg>Profile</button>
+  </div>
+</nav>
+
+<dialog id="addDialog" aria-labelledby="addTitle">
+  <div class="grabber"></div>
+  <form method="dialog" id="addForm">
+    <h2 id="addTitle">Add food</h2>
+    <label>Food<input name="name" required autocomplete="off"></label>
+    <div class="grid2">
+      <label>Portion<input name="portion" placeholder="1 cup"></label>
+      <label>Servings<input name="servings" type="number" inputmode="decimal" min="0.25" step="0.25" value="1" required></label>
+    </div>
+    <div class="grid4">
+      <label>Kcal<input name="calories" type="number" inputmode="numeric" min="0" step="1" required></label>
+      <label>Protein<input name="protein" type="number" inputmode="decimal" min="0" step="0.1"></label>
+      <label>Carbs<input name="carbs" type="number" inputmode="decimal" min="0" step="0.1"></label>
+      <label>Fat<input name="fat" type="number" inputmode="decimal" min="0" step="0.1"></label>
+    </div>
+    <label>Meal<select name="meal"></select></label>
+    <div class="row" style="gap:8px"><button class="btn ghost grow" value="cancel" formnovalidate>Cancel</button><button class="btn hot grow" value="ok">Add to diary</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+import { targets, sum } from './calc.js';
+import { grab } from './dining.js';
+import { plan } from './coach.js';
+
+const KEY = 'forge:v1';
+const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const n = v => Math.max(0, Number(v) || 0);
+const r0 = v => Math.round(v);
+const dayKey = d => d.toLocaleDateString('en-CA');
+const todayKey = () => dayKey(new Date());
+const icon = (id, size = 18) => `<svg width="${size}" height="${size}" aria-hidden="true"><use href="#${id}"/></svg>`;
+const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
+
+const DEFAULT = { profile: { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'maintain', calorieGoal: 0 }, profileSet: false, log: {}, menu: null };
+function load() {
+  try { return { ...structuredClone(DEFAULT), ...JSON.parse(localStorage.getItem(KEY) || localStorage.getItem('ninerfuel:v1') || 'null') }; }
+  catch { return structuredClone(DEFAULT); }
+}
+let S = load();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast('Couldn’t save. Storage is full or blocked.'); } }
+let day = todayKey();
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600); }
+function mealNow() { const h = new Date().getHours() + new Date().getMinutes() / 60; return h < 10.5 ? 'Breakfast' : h < 15 ? 'Lunch' : h < 21 ? 'Dinner' : 'Snacks'; }
+const mealFor = text => MEALS.find(m => String(text).toLowerCase().includes(m.toLowerCase().slice(0, 5)));
+const dietBadges = tags => (tags || []).includes('Vegan') ? '<span class="badge v">VG</span>' : (tags || []).includes('Vegetarian') ? '<span class="badge v">V</span>' : '';
+
+// ---------- tabs & date ----------
+function go(tab) {
+  document.querySelectorAll('section[data-tab]').forEach(s => s.classList.toggle('on', s.dataset.tab === tab));
+  document.querySelectorAll('nav.tabs button').forEach(b => { b.classList.toggle('on', b.dataset.go === tab); b.setAttribute('aria-current', b.dataset.go === tab ? 'page' : 'false'); });
+  scrollTo({ top: 0 });
+}
+document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.go));
+function shiftDay(d) { const t = new Date(day + 'T12:00'); t.setDate(t.getDate() + d); day = dayKey(t); renderDiary(); }
+$('#prevDay').onclick = () => shiftDay(-1);
+$('#nextDay').onclick = () => shiftDay(1);
+
+// ---------- diary ----------
+function renderDiary() {
+  const t = new Date(day + 'T12:00'), diff = Math.round((t - new Date(todayKey() + 'T12:00')) / 864e5);
+  $('#dayLabel').textContent = diff === 0 ? 'Today' : diff === -1 ? 'Yesterday' : diff === 1 ? 'Tomorrow' : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const entries = S.log[day] || [];
+  const goal = targets(S.profile), got = sum(entries), left = goal.calories - got.calories;
+  $('#remaining').textContent = Math.abs(left).toLocaleString();
+  $('#remainingLbl').textContent = left >= 0 ? 'kcal left' : 'kcal over';
+  $('#gauge').classList.toggle('over', left < 0);
+  $('#gaugeFill').style.strokeDashoffset = 326.7 * (1 - Math.min(1, got.calories / goal.calories));
+  $('#goalK').textContent = goal.calories.toLocaleString();
+  $('#eatenK').textContent = got.calories.toLocaleString();
+  $('#proK').textContent = `${Math.max(0, goal.protein - got.protein)}g`;
+  $('#macros').innerHTML = [['Protein', 'protein', '--pro'], ['Carbs', 'carbs', '--carb'], ['Fat', 'fat', '--fat']].map(([label, k, c]) => `
+    <div class="macro"><div class="top">${label}<span><b>${got[k]}</b><small> / ${goal[k]}g</small></span></div>
+    <div class="track-bar"><i style="width:${Math.min(100, (got[k] / Math.max(1, goal[k])) * 100)}%;background:var(${c})"></i></div></div>`).join('');
+  $('#meals').innerHTML = MEALS.map(meal => {
+    const list = entries.map((e, i) => [e, i]).filter(([e]) => e.meal === meal);
+    return `<div class="card"><div class="meal-head"><h3>${meal}</h3><span class="num">${sum(list.map(([e]) => e)).calories} kcal</span></div>
+      ${list.length ? list.map(([e, i]) => `<div class="entry"><div class="grow"><div class="name">${esc(e.name)}</div>
+        <div class="sub">${esc(e.portion)}${e.servings != 1 ? ` × ${e.servings}` : ''} · P${r0(e.protein * e.servings)} C${r0(e.carbs * e.servings)} F${r0(e.fat * e.servings)}${e.source ? ` · ${esc(e.source)}` : ''}</div></div>
+        <span class="kcal">${r0(e.calories * e.servings)}</span><button class="iconbtn" data-del="${i}" aria-label="Remove ${esc(e.name)}">${icon('i-x')}</button></div>`).join('') : '<div class="empty-note">Nothing logged yet.</div>'}
+      <button class="btn sm ghost" data-add="${meal}" style="margin-top:8px">${icon('i-plus', 16)} Add food</button></div>`;
+  }).join('');
+}
+$('#meals').onclick = e => {
+  const del = e.target.closest('[data-del]'), add = e.target.closest('[data-add]');
+  if (del) { S.log[day].splice(Number(del.dataset.del), 1); save(); renderDiary(); }
+  if (add) openAdd({ meal: add.dataset.add });
+};
+function addEntry(food) {
+  (S.log[day] ||= []).push({
+    meal: MEALS.includes(food.meal) ? food.meal : mealNow(), name: String(food.name).slice(0, 120), portion: String(food.portion || '').slice(0, 60),
+    servings: n(food.servings) || 1, calories: n(food.calories), protein: n(food.protein), carbs: n(food.carbs), fat: n(food.fat), source: String(food.source || '').slice(0, 60),
+  });
+  save(); renderDiary();
+}
+
+// ---------- add sheet ----------
+const addForm = $('#addForm');
+addForm.meal.innerHTML = MEALS.map(m => `<option>${m}</option>`).join('');
+let addSource = '';
+function openAdd(food = {}) {
+  addForm.reset();
+  for (const k of ['name', 'portion', 'calories', 'protein', 'carbs', 'fat']) addForm[k].value = food[k] ?? '';
+  addForm.servings.value = food.servings || 1;
+  addForm.meal.value = food.meal || mealNow();
+  addSource = food.source || '';
+  $('#addTitle').textContent = food.name ? 'Log it' : 'Add food';
+  $('#addDialog').showModal();
+}
+$('#addDialog').addEventListener('close', () => {
+  if ($('#addDialog').returnValue !== 'ok') return;
+  addEntry({ ...Object.fromEntries(new FormData(addForm)), source: addSource });
+  toast(`Logged to ${day === todayKey() ? 'today' : $('#dayLabel').textContent}`);
+});
+$('#addDialog').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close('cancel'); });
+
+// ---------- campus menus ----------
+const bookmarkletCode = 'javascript:' + encodeURIComponent(`(${grab.toString()})(${JSON.stringify(APP_URL)})`);
+$('#bookmarklet').href = bookmarkletCode;
+$('#bookmarklet').onclick = e => { e.preventDefault(); toast('Drag it to your bookmarks bar, then click it on Dine On Campus.'); };
+document.querySelectorAll('.copybm').forEach(b => b.onclick = async () => {
+  try { await navigator.clipboard.writeText(bookmarkletCode); toast('Import code copied'); } catch { toast('Couldn’t copy. Try again in Safari or Chrome.'); }
+});
+document.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-dev]').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-help]').forEach(x => x.classList.toggle('hidden', x.dataset.help !== b.dataset.dev));
+});
+const ua = navigator.userAgent;
+const dev = /iPhone|iPad|iPod/.test(ua) ? 'iphone' : /Android/.test(ua) ? 'android' : 'desktop';
+document.querySelector(`[data-dev="${dev}"]`).click();
+
+const clean = i => ({ location: String(i.location).slice(0, 80), period: String(i.period).slice(0, 40), station: String(i.station).slice(0, 80),
+  name: String(i.name).slice(0, 120), portion: String(i.portion || '').slice(0, 60), calories: n(i.calories), protein: n(i.protein), carbs: n(i.carbs), fat: n(i.fat),
+  tags: Array.isArray(i.tags) ? i.tags.slice(0, 30).map(t => String(t).slice(0, 40)) : [], ingredients: String(i.ingredients || '').slice(0, 400) });
+function importMenus(data) {
+  if (data?.type !== 'forge-menus' || !Array.isArray(data.items)) return false;
+  const items = data.items.slice(0, 8000).filter(i => i && typeof i === 'object').map(clean);
+  S.menu = { date: /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : todayKey(), items, at: Date.now() };
+  save(); renderCampus(); go('campus'); toast(`Loaded ${items.length} menu items`);
+  return true;
+}
+addEventListener('message', e => {
+  if (e.origin !== 'https://dineoncampus.com') return;
+  if (importMenus(e.data)) e.source?.postMessage({ type: 'forge-ack' }, e.origin);
+});
+function importText(text) {
+  try { if (!importMenus(JSON.parse(text))) throw 0; $('#pasteBox').classList.add('hidden'); }
+  catch { toast('That isn’t a FORGE menu. Tap Copy on Dine On Campus first.'); }
+}
+$('#pasteBtn').onclick = async () => {
+  try { importText(await navigator.clipboard.readText()); }
+  catch { $('#pasteBox').classList.remove('hidden'); $('#pasteText').focus(); } // clipboard read not allowed: paste by hand
+};
+$('#pasteImport').onclick = () => importText($('#pasteText').value);
+
+const menuToday = () => S.menu?.date === todayKey() ? S.menu.items : null;
+function renderCampus() {
+  const items = S.menu?.items || [], fresh = !!menuToday();
+  $('#menuStatus').innerHTML = !S.menu ? '<span class="status-dot"></span>No menu loaded yet' :
+    `<span class="status-dot ${fresh ? 'live' : ''}"></span>${items.length} items · ${new Date(S.menu.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}${fresh ? '' : ' · old, reload for today'}`;
+  $('#importHelp').open = !fresh;
+  $('#menuCard').classList.toggle('hidden', !items.length);
+  $('#useCampus').disabled = !fresh;
+  $('#useCampus').checked = fresh;
+  const opts = (sel, vals, all) => { const v = sel.value; sel.innerHTML = `<option value="">${all}</option>` + vals.map(x => `<option>${esc(x)}</option>`).join(''); if (vals.includes(v)) sel.value = v; };
+  opts($('#locFilter'), [...new Set(items.map(i => i.location))].sort(), 'All locations');
+  opts($('#periodFilter'), [...new Set(items.map(i => i.period))], 'All meals');
+  renderMenuList();
+}
+function renderMenuList() {
+  const loc = $('#locFilter').value, per = $('#periodFilter').value, q = $('#menuSearch').value.trim().toLowerCase();
+  const items = (S.menu?.items || []).map((it, idx) => ({ it, idx }))
+    .filter(({ it }) => (!loc || it.location === loc) && (!per || it.period === per) && (!q || it.name.toLowerCase().includes(q) || it.station.toLowerCase().includes(q)));
+  let last = '';
+  $('#menuList').innerHTML = items.slice(0, 300).map(({ it, idx }) => {
+    const head = `${it.location} · ${it.period}`, h = head + it.station !== last ? `<div class="station">${esc(it.station)} <span>· ${esc(head)}</span></div>` : '';
+    last = head + it.station;
+    return `${h}<div class="entry food" data-food="${idx}" role="button" tabindex="0"><div class="grow"><div class="name">${esc(it.name)}${dietBadges(it.tags)}</div>
+      <div class="sub">${esc(it.portion)} · P${it.protein} C${it.carbs} F${it.fat}</div></div><span class="kcal">${it.calories}<small>kcal</small></span></div>`;
+  }).join('') || '<div class="empty-note">Nothing matches.</div>';
+  if (items.length > 300) $('#menuList').insertAdjacentHTML('beforeend', `<div class="empty-note" style="margin-top:10px">Showing 300 of ${items.length}. Narrow it down with the filters.</div>`);
+}
+['#locFilter', '#periodFilter'].forEach(s => $(s).onchange = renderMenuList);
+$('#menuSearch').oninput = renderMenuList;
+function pickFood(el) { const it = S.menu.items[el.dataset.food]; openAdd({ ...it, meal: mealFor(it.period), source: it.location }); }
+$('#menuList').onclick = e => { const el = e.target.closest('[data-food]'); if (el) pickFood(el); };
+$('#menuList').onkeydown = e => { const el = e.target.closest('[data-food]'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickFood(el); } };
+
+// ---------- coach ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) $('#micBtn').classList.add('hidden');
+let rec = null;
+$('#micBtn').onclick = () => {
+  const btn = $('#micBtn');
+  if (rec) { rec.stop(); return; }
+  rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true;
+  const before = $('#goalText').value ? $('#goalText').value + ' ' : '';
+  rec.onresult = e => $('#goalText').value = before + [...e.results].map(r => r[0].transcript).join('');
+  rec.onerror = e => { $('#coachErr').textContent = e.error === 'not-allowed' ? 'Microphone is blocked. Allow it in your browser settings.' : `Voice stopped (${e.error}). Type it instead.`; };
+  rec.onend = () => { rec = null; btn.classList.remove('live'); btn.setAttribute('aria-pressed', 'false'); };
+  rec.start(); btn.classList.add('live'); btn.setAttribute('aria-pressed', 'true'); $('#coachErr').textContent = '';
+};
+$('#chips').onclick = e => { const c = e.target.closest('.chip'); if (c) { $('#goalText').value = c.textContent; $('#askBtn').click(); } };
+$('#askBtn').onclick = () => {
+  $('#coachErr').textContent = '';
+  const goal = $('#goalText').value.trim();
+  if (!goal) { $('#coachErr').textContent = 'Say or type a goal first.'; return; }
+  renderCoach(plan({ goal, profile: S.profile, eaten: S.log[todayKey()] || [], menu: $('#useCampus').checked ? menuToday() : null }));
+  $('#coachResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+let coachFoods = [];
+function renderCoach(r) {
+  coachFoods = [];
+  const t = r.dailyTargets;
+  $('#coachResult').innerHTML = `
+    <div class="card"><p class="eyebrow">The plan</p><p style="margin:0">${esc(r.summary)}</p>
+      <div class="stats">
+        <div class="stat kcal"><b>${r0(t.calories).toLocaleString()}</b><span>Kcal</span></div>
+        <div class="stat"><b>${r0(t.protein)}</b><span>Protein</span></div>
+        <div class="stat"><b>${r0(t.carbs)}</b><span>Carbs</span></div>
+        <div class="stat"><b>${r0(t.fat)}</b><span>Fat</span></div>
+      </div>
+      <button class="btn block" id="useTargets">Set ${r0(t.calories).toLocaleString()} kcal as my goal</button></div>
+    ${r.suggestions.map(s => `<div class="sugg"><div class="where">${esc(s.where)}</div><h3>${esc(s.meal)}</h3>
+      ${s.foods.map(f => { const i = coachFoods.push({ ...f, meal: mealFor(s.meal), source: s.where === 'Anywhere' ? 'Coach' : s.where.split(' - ')[0] }) - 1;
+        return `<div class="entry"><div class="grow"><div class="name">${esc(f.name)}</div><div class="sub">${esc(f.portion)} · P${r0(f.protein)} C${r0(f.carbs)} F${r0(f.fat)}</div></div>
+        <span class="kcal">${r0(f.calories)}</span><button class="iconbtn" data-cf="${i}" aria-label="Log ${esc(f.name)}" style="color:var(--ember)">${icon('i-plus', 20)}</button></div>`; }).join('')}
+      <p class="muted" style="margin:8px 0 2px">${esc(s.why)}</p></div>`).join('')}
+    ${r.tips.length ? `<div class="card"><p class="eyebrow">Tips</p><ul class="tips">${r.tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}`;
+  $('#useTargets').onclick = () => { S.profile.calorieGoal = r0(t.calories); save(); renderAll(); toast('Daily goal updated'); };
+  $('#coachResult').querySelectorAll('[data-cf]').forEach(b => b.onclick = () => { day = todayKey(); renderDiary(); openAdd(coachFoods[b.dataset.cf]); });
+}
+
+// ---------- profile & backup ----------
+const pf = $('#profileForm');
+function renderProfile() {
+  const p = S.profile;
+  pf.sex.value = p.sex; pf.age.value = p.age; pf.ft.value = Math.floor(p.heightIn / 12); pf.inch.value = r0(p.heightIn % 12);
+  pf.weightLb.value = p.weightLb; pf.activity.value = p.activity; pf.goal.value = p.goal; pf.calorieGoal.value = p.calorieGoal || '';
+  const t = targets(p);
+  $('#targetStats').innerHTML = `<div class="stat kcal"><b>${t.calories.toLocaleString()}</b><span>Kcal</span></div><div class="stat"><b>${t.protein}</b><span>Protein</span></div>
+    <div class="stat"><b>${t.carbs}</b><span>Carbs</span></div><div class="stat"><b>${t.fat}</b><span>Fat</span></div>`;
+  $('#profileEyebrow').textContent = S.profileSet ? 'You' : 'Step 1';
+  $('#profileTitle').textContent = S.profileSet ? 'Profile' : 'Set up your numbers';
+}
+pf.onsubmit = e => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(pf));
+  const first = !S.profileSet;
+  S.profile = { sex: f.sex, age: n(f.age), heightIn: n(f.ft) * 12 + n(f.inch), weightLb: n(f.weightLb), activity: f.activity, goal: f.goal, calorieGoal: n(f.calorieGoal) };
+  S.profileSet = true;
+  save(); renderAll(); toast('Saved');
+  if (first) go('diary');
+};
+$('#exportBtn').onclick = () => {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' })), download: `forge-backup-${todayKey()}.json` });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#importFile').onchange = async e => {
+  try {
+    const d = JSON.parse(await e.target.files[0].text());
+    if (!d.profile || typeof d.log !== 'object') throw 0;
+    if (!confirm('Replace everything on this device with the backup?')) return;
+    S = { ...structuredClone(DEFAULT), ...d, profileSet: true }; save(); renderAll(); toast('Backup restored');
+  } catch { toast('That file isn’t a FORGE backup.'); }
+  e.target.value = '';
+};
+addEventListener('storage', e => { if (e.key === KEY) { S = load(); renderAll(); } });
+
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+$('#installHint').textContent = standalone ? '' : dev === 'iphone' ? 'Tip: tap Share → Add to Home Screen to install FORGE.' : dev === 'android' ? 'Tip: tap ⋮ → Add to Home screen to install FORGE.' : '';
+
+function renderAll() { renderDiary(); renderCampus(); renderProfile(); }
+renderAll();
+if (new URLSearchParams(location.search).has('import')) { go('campus'); history.replaceState(null, '', location.pathname); }
+else if (!S.profileSet) go('profile');
+const badgeCheck = () => document.body.classList.toggle('host-badge', !!document.getElementById('nl-badge-frame'));
+new MutationObserver(badgeCheck).observe(document.body, { childList: true });
+badgeCheck();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
