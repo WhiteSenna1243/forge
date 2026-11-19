@@ -68,3 +68,13 @@ test('staleDays downloads only missing or newer shared menus', async () => {
   const local = { d1: [{}], d3: [{}] };
   assert.deepEqual(staleDays(rows, have, local), ['d2', 'd3']);
 });
+
+test('merge combines workouts and my foods from two devices', async () => {
+  const { merge } = await import('../public/sync.js');
+  const local = { profile: P, log: {}, workouts: { d1: [{ id: 'w1', exercises: [] }] }, myFoods: [{ id: 'f1', name: 'Mom lasagna' }], updatedAt: 2 };
+  const remote = { profile: P, log: {}, workouts: { d1: [{ id: 'w2', exercises: [] }] }, myFoods: [{ id: 'f2', name: 'Protein oats' }], trainPlan: { days: 3 }, updatedAt: 1 };
+  const m = merge(local, remote);
+  assert.deepEqual(m.workouts.d1.map(w => w.id).sort(), ['w1', 'w2']);
+  assert.deepEqual(m.myFoods.map(f => f.id).sort(), ['f1', 'f2']);
+  assert.deepEqual(m.trainPlan, { days: 3 });
+});

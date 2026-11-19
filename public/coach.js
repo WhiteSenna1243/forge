@@ -147,7 +147,7 @@ const fmt = n => Math.round(n).toLocaleString('en-US');
 const strip = ({ name, portion, calories, protein, carbs, fat }) => ({ name, portion, calories, protein, carbs, fat });
 
 // menu: today's imported campus items or null. eaten: today's diary entries.
-export function plan({ goal, profile, eaten = [], menu = null, now = new Date() }) {
+export function plan({ goal, profile, eaten = [], menu = null, now = new Date(), training = null }) {
   const g = parseGoal(goal, now);
   const dir = g.direction || profile.goal || 'maintain';
   const maint = targets({ ...profile, goal: 'maintain', calorieGoal: 0 }).calories;
@@ -170,7 +170,8 @@ export function plan({ goal, profile, eaten = [], menu = null, now = new Date() 
     daily = floor;
   }
   daily = Math.round(daily / 10) * 10;
-  const protein = g.protein || Math.round(profile.weightLb * (dir === 'maintain' ? 0.8 : 1));
+  const lifts = (training?.strengthDays || 0) >= 3;
+  const protein = g.protein || Math.round(profile.weightLb * (dir === 'maintain' && !lifts ? 0.8 : 1));
   const fat = Math.round((daily * 0.25) / 9);
   const carbs = Math.max(0, Math.round((daily - protein * 4 - fat * 9) / 4));
 
@@ -207,6 +208,10 @@ export function plan({ goal, profile, eaten = [], menu = null, now = new Date() 
   if ([...g.prefs.tags].some(x => ALLERGENS.some(([, tag]) => tag === x))) tips.push('Menu allergen labels can be wrong or change, and cross-contact happens. Always confirm with dining staff before eating.');
   if (/halal|kosher/.test(String(goal).toLowerCase())) tips.push('The menu doesn\u2019t say which meat is halal or kosher, so I only removed pork. Ask dining staff which options are certified.');
   if (leftCal >= 150 && !suggestions.length) tips.push('Nothing on today\u2019s menu fits those preferences for that meal. Try another meal, or check the Campus tab yourself.');
+  // Working together with the workout coach.
+  if (training?.today) tips.unshift(`Training day (${training.today}): have 30-40 g of carbs and 25+ g of protein 1-2 hours before, and protein again within a few hours after.`);
+  if (training?.burned) tips.push(`You burned about ${training.burned} kcal training today. Half of it is added to today's budget.`);
+  if (lifts && !g.protein) tips.push(`Protein is set to 1 g per lb because your workout plan has ${training.strengthDays} lifting days a week.`);
   if (!menu) tips.push('Import today’s campus menu (Campus tab) and these suggestions will come from the dining halls.');
   if (!g.direction && !g.pounds && !g.protein && !g.calories && !g.meal) tips.push('I couldn’t find a specific goal there, so I used your profile. Try something like "lose 10 pounds by spring break" or "150g protein, what should I eat tonight?"');
   if (dir === 'lose') tips.push('Weigh yourself a few mornings a week and watch the weekly average. Day-to-day numbers jump around with water.', 'Drinks count: a large sweet tea or a frappuccino can be 300-500 kcal.');
@@ -214,5 +219,5 @@ export function plan({ goal, profile, eaten = [], menu = null, now = new Date() 
   else tips.push('Spread protein across your meals (about 30g each) rather than saving it for dinner.');
   tips.push('This is general guidance, not medical advice. See a doctor or dietitian if you have a health condition.');
 
-  return { summary, dailyTargets: { calories: daily, protein, carbs, fat }, suggestions, tips: tips.slice(0, 6) };
+  return { summary, dailyTargets: { calories: daily, protein, carbs, fat }, suggestions, tips: tips.slice(0, 7) };
 }

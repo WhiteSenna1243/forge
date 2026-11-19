@@ -36,7 +36,7 @@ export async function deleteMine(db, userId) {
 }
 
 // What gets stored in the account. The campus menu stays on the device (it's big and changes daily).
-export const doc = s => ({ profile: s.profile, profileSet: !!s.profileSet, log: s.log || {}, updatedAt: s.updatedAt || 0 });
+export const doc = s => ({ profile: s.profile, profileSet: !!s.profileSet, log: s.log || {}, myFoods: s.myFoods || [], workouts: s.workouts || {}, trainPlan: s.trainPlan || null, updatedAt: s.updatedAt || 0 });
 
 const newId = () => (globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 export function withIds(log = {}) {
@@ -45,23 +45,31 @@ export function withIds(log = {}) {
 }
 export { newId };
 
-const hasData = s => !!s.profileSet || Object.values(s.log || {}).some(l => l.length);
+const hasData = s => !!s.profileSet || Object.values(s.log || {}).some(l => l.length) || (s.myFoods || []).length > 0 || Object.keys(s.workouts || {}).length > 0;
+
+// Combine two { day: [items with id] } maps, keeping every id once.
+function unionByDay(a = {}, b = {}) {
+  const out = {};
+  for (const src of [a, b]) for (const [day, list] of Object.entries(src)) {
+    const byId = new Map((out[day] || []).map(e => [e.id, e]));
+    for (const e of list) if (!byId.has(e.id)) byId.set(e.id, e);
+    out[day] = [...byId.values()];
+  }
+  return out;
+}
 
 // Combine two copies: newest profile wins, food entries are combined (matched by id).
 export function merge(local, remote) {
   const newer = (remote.updatedAt || 0) > (local.updatedAt || 0) ? remote : local;
-  const log = {};
-  for (const src of [remote.log || {}, local.log || {}]) {
-    for (const [day, list] of Object.entries(src)) {
-      const byId = new Map((log[day] || []).map(e => [e.id, e]));
-      for (const e of list) if (!byId.has(e.id)) byId.set(e.id, e);
-      log[day] = [...byId.values()];
-    }
-  }
-  return { ...local, profile: newer.profile, profileSet: !!(local.profileSet || remote.profileSet), log, updatedAt: Date.now() };
+  const foods = new Map([...(remote.myFoods || []), ...(local.myFoods || [])].map(f => [f.id, f]));
+  return {
+    ...local, profile: newer.profile, profileSet: !!(local.profileSet || remote.profileSet),
+    log: unionByDay(remote.log, local.log), workouts: unionByDay(remote.workouts, local.workouts),
+    myFoods: [...foods.values()], trainPlan: newer.trainPlan || local.trainPlan || remote.trainPlan || null, updatedAt: Date.now(),
+  };
 }
 
-const adopt = (local, remote) => ({ ...local, profile: remote.profile, profileSet: !!remote.profileSet, log: remote.log || {}, updatedAt: remote.updatedAt || 0 });
+const adopt = (local, remote) => ({ ...local, profile: remote.profile, profileSet: !!remote.profileSet, log: remote.log || {}, myFoods: remote.myFoods || [], workouts: remote.workouts || {}, trainPlan: remote.trainPlan || null, updatedAt: remote.updatedAt || 0 });
 
 // Decide what this device should hold after seeing the account's copy, and whether to upload.
 // local.syncedUser / local.syncedAt record which account this device last synced with, and when.

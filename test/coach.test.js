@@ -96,3 +96,10 @@ test('goal words are not dislikes; allergies drop unlabeled items', async () => 
   assert.equal(allowed({ name: 'French Fries', tags: [] }, gf), false);
   assert.equal(allowed({ name: 'Grilled Chicken', tags: ['Poultry'] }, gf), true);
 });
+
+test('nutrition coach listens to the workout plan', () => {
+  const r = plan({ goal: 'maintain', profile: me, now, training: { today: 'Push', strengthDays: 4, burned: 300 } });
+  assert.equal(r.dailyTargets.protein, 160); // 1 g/lb with 3+ lifting days
+  assert.match(r.tips[0], /Training day \(Push\)/);
+  assert.ok(r.tips.some(t => /burned about 300/.test(t)));
+});
