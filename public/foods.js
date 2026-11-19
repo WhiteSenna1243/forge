@@ -1,7 +1,7 @@
 // Food lookup: USDA FoodData Central (lab-measured generic foods, restaurant dishes, branded labels)
 // and Open Food Facts (store products by name or barcode). Everything is normalized to per-100 g
 // values plus a list of portions, so any amount can be logged.
-import { USDA_API_KEY } from './config.js?v=6';
+import { USDA_API_KEY } from './config.js?v=7';
 
 const USDA = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 const OFF_SEARCH = 'https://world.openfoodfacts.org/cgi/search.pl'; // allows browser requests from https sites (not localhost)
@@ -82,13 +82,25 @@ export function looksWrong(per100) {
 
 const usable = f => f.per100.calories > 0 || f.per100.protein + f.per100.carbs + f.per100.fat > 0;
 
-export async function searchUSDA(query, { kinds } = {}) {
-  const types = kinds || ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'];
-  const url = `${USDA}?api_key=${encodeURIComponent(USDA_API_KEY || 'DEMO_KEY')}&query=${encodeURIComponent(query)}&pageSize=30&requireAllWords=true&dataType=${types.map(t => t.replace(/ /g, '%20')).join(',')}`; // USDA rejects encoded commas/parentheses here
+async function usdaRequest(query, types, size) {
+  const url = `${USDA}?api_key=${encodeURIComponent(USDA_API_KEY || 'DEMO_KEY')}&query=${encodeURIComponent(query)}&pageSize=${size}&requireAllWords=true&dataType=${types.map(t => t.replace(/ /g, '%20')).join(',')}`; // USDA rejects encoded commas/parentheses here
   const r = await fetch(url);
-  if (r.status === 429) throw new Error('USDA search limit reached for now. Try again in a bit, or add a free USDA key.');
+  if (r.status === 429) throw new Error('USDA search limit reached for now. Try again in a bit.');
   if (!r.ok) throw new Error(`USDA search failed (${r.status})`);
   return ((await r.json()).foods || []).map(normalizeUSDA).filter(usable);
+}
+
+// Plain foods and brand-name products are fetched separately: in one request brands crowd out
+// the lab-measured basics, and USDA's server rejects some mixed queries.
+export async function searchUSDA(query, { kinds } = {}) {
+  // One request per group: USDA's server rejects some queries that mix these types.
+  const groups = [['Foundation', 'SR Legacy'], ['Survey (FNDDS)'], ['Branded']].map(g => g.filter(k => !kinds || kinds.includes(k)));
+  const [lab, dish, brand] = await Promise.allSettled(groups.map(g => (g.length ? usdaRequest(query, g, g[0] === 'Branded' ? 15 : 10) : [])));
+  if ([lab, dish, brand].every(x => x.status === 'rejected')) throw lab.reason;
+  const a = { value: [...(lab.value || []), ...(dish.value || [])] }, b = brand;
+  const q = query.trim().toLowerCase(), first = q.split(/\s+/)[0].replace(/s$/, '');
+  const score = f => { const nm = f.name.toLowerCase(), head = nm.split(',')[0].trim().replace(/s$/, ''); const top = nm.split(',').slice(0, 2).join(' '); return (head === first ? -40 : 0) + (q.split(/\s+/).every(w => top.includes(w.replace(/s$/, ''))) ? 0 : 100) + (/\b(raw|plain|cooked)\b/.test(nm) ? -15 : 0) + (/\bwhole\b/.test(nm) ? -10 : 0) + ['dehydrated', 'powder', 'dried', 'baby food', 'canned', 'flour', 'yolk', 'gelatinized', 'frozen'].filter(w => nm.includes(w) && !q.includes(w)).length * 30 + nm.length / 4; };
+  return [...(a.value || []).sort((x, y) => score(x) - score(y)), ...(b.value || [])];
 }
 
 export async function searchOFF(query) {
