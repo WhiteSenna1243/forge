@@ -1,5 +1,5 @@
 // Free, offline goal coach: reads a goal sentence, sets daily targets, and builds meals from the campus menu.
-import { targets, sum } from './calc.js?v=6';
+import { targets, sum } from './calc.js?v=7';
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const WORDS = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, eight: 8, ten: 10, twelve: 12 };
