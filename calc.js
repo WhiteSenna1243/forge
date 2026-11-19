@@ -17,7 +17,7 @@ export function targets(p) {
     const pace = Math.min(wanted, p.weightLb * 0.01); // more than ~1% of body weight a week isn't safe
     calories = Math.max(floor, Math.round(maintenance + dir * pace * KCAL_PER_LB_PER_WEEK));
   }
-  const protein = Math.round(p.weightLb * 0.8);
+  const protein = Math.round(p.weightLb * (p.trainDays >= 3 ? 1 : 0.8)); // lifting 3+ days a week needs more protein
   const fat = Math.round((calories * 0.25) / 9);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
   // The pace these calories actually give (after the safety caps), in lb/week.
