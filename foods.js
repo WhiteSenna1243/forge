@@ -1,7 +1,7 @@
 // Food lookup: USDA FoodData Central (lab-measured generic foods, restaurant dishes, branded labels)
 // and Open Food Facts (store products by name or barcode). Everything is normalized to per-100 g
 // values plus a list of portions, so any amount can be logged.
-import { USDA_API_KEY } from './config.js';
+import { USDA_API_KEY } from './config.js?v=6';
 
 const USDA = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 const OFF_SEARCH = 'https://world.openfoodfacts.org/cgi/search.pl'; // allows browser requests from https sites (not localhost)

@@ -555,12 +555,12 @@ dialog.tall { min-height: 70dvh; }
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { targets, sum, goalETA, PACES } from './calc.js';
-import { grab } from './dining.js';
-import { plan } from './coach.js';
-import * as sync from './sync.js';
-import * as F from './foods.js';
-import * as T from './training.js';
+import { targets, sum, goalETA, PACES } from './calc.js?v=6';
+import { grab } from './dining.js?v=6';
+import { plan } from './coach.js?v=6';
+import * as sync from './sync.js?v=6';
+import * as F from './foods.js?v=6';
+import * as T from './training.js?v=6';
 
 const KEY = 'forge:v1';
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -584,6 +584,7 @@ function load() {
   return s;
 }
 let S = load();
+let db = null, user = null, syncing = false, again = false, syncTimer; // declared early: renders run before login finishes
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast('Couldn’t save. Storage is full or blocked.'); } }
 // Every change saves on the device right away, then uploads to the account shortly after.
 function save() { S.updatedAt = Date.now(); S.dirty = true; persist(); scheduleSync(); }
@@ -1257,7 +1258,6 @@ if (new URLSearchParams(location.search).has('import')) { go('campus'); history.
 else if (!S.profileSet) go('profile');
 
 // ---------- accounts & sync ----------
-let db = null, user = null, syncing = false, again = false, syncTimer;
 const setSync = t => { $('#syncText').textContent = t; };
 function scheduleSync() { clearTimeout(syncTimer); syncTimer = setTimeout(runSync, 1200); }
 async function runSync() {
