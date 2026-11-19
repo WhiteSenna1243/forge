@@ -1,5 +1,5 @@
 // Offline support: always try the network first (so updates show up), fall back to the last copy.
-const CACHE = 'forge-v5';
+const CACHE = 'forge-v6';
 const SHELL = ['./', 'index.html', 'calc.js', 'coach.js', 'dining.js', 'sync.js', 'config.js', 'foods.js', 'training.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); });
