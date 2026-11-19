@@ -196,6 +196,14 @@ dialog[open] { animation: sheet .22s ease-out; }
   font: 600 15px var(--body); padding: 11px 18px; border-radius: 14px; opacity: 0; pointer-events: none; transition: .2s; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 .hidden { display: none !important; }
+.opt { background: var(--s1); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; margin-bottom: 10px; }
+.opt .where { font: 700 12px var(--display); letter-spacing: 1.5px; text-transform: uppercase; color: var(--ember); }
+.opt h3 { margin: 2px 0 4px; font: 800 20px var(--display); letter-spacing: .5px; text-transform: uppercase; }
+.opt .tot { display: flex; gap: 12px; font: 700 14px var(--display); letter-spacing: 1px; color: var(--muted); margin: 6px 0 2px; }
+.opt .tot b { color: var(--ink); font-size: 17px; }
+.left-line { font-size: 15px; color: var(--muted); margin: 10px 0 0; }
+.left-line b { color: var(--ink); }
+nav.tabs button { font-size: 10px; letter-spacing: 1px; }
 /* ---------- food sources & sheets ---------- */
 dialog.tall { min-height: 70dvh; }
 .src { font: 700 10px var(--display); letter-spacing: 1px; text-transform: uppercase; padding: 2px 6px; border-radius: 6px; background: var(--s2); white-space: nowrap; }
@@ -259,6 +267,7 @@ dialog.tall { min-height: 70dvh; }
     <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
     <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></symbol>
     <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-meal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18a9 9 0 0 1-18 0Z"/><path d="M8 8c0-1.5 1-2 1-3.5M12 8c0-1.5 1-2 1-3.5M16 8c0-1.5 1-2 1-3.5"/></symbol>
     <symbol id="i-train" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6v12M18 6v12M2.5 9.5v5M21.5 9.5v5M6 12h12"/></symbol>
     <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></symbol>
@@ -315,6 +324,23 @@ dialog.tall { min-height: 70dvh; }
     </div>
     <div id="meals" style="margin-top:12px"></div>
     <div id="exerciseCard"></div>
+  </section>
+
+  <!-- MEALS -->
+  <section data-tab="meals">
+    <p class="eyebrow">What to eat next</p>
+    <h2>Meals</h2>
+    <div class="card" id="mealProgress"></div>
+    <div class="chips" id="mealPick" role="tablist" aria-label="Which meal">
+      <button class="chip" data-mp="">Next meal</button><button class="chip" data-mp="Breakfast">Breakfast</button><button class="chip" data-mp="Lunch">Lunch</button><button class="chip" data-mp="Dinner">Dinner</button><button class="chip" data-mp="Snacks">Snack</button>
+    </div>
+    <div id="mealOptions"></div>
+    <div class="card" id="mealNotesCard"><p class="eyebrow">Why these</p><ul class="tips" id="mealNotes"></ul></div>
+    <details class="card" id="prefsBox">
+      <summary>Diet, allergies &amp; foods you avoid</summary>
+      <form id="prefsForm" class="row" style="gap:8px;margin-top:12px"><input id="prefsInput" placeholder="vegetarian, peanut allergy, hate mushrooms" aria-label="Diet and foods to avoid" style="margin:0"><button class="btn" type="submit">Save</button></form>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Used by Meals and the nutrition coach. Allergy labels can be wrong, so always confirm with dining staff.</p>
+    </details>
   </section>
 
   <!-- CAMPUS -->
@@ -472,6 +498,7 @@ dialog.tall { min-height: 70dvh; }
 <nav class="tabs" aria-label="Sections">
   <div class="inner">
     <button data-go="diary" class="on"><svg><use href="#i-diary"/></svg>Diary</button>
+    <button data-go="meals"><svg><use href="#i-meal"/></svg>Meals</button>
     <button data-go="campus"><svg><use href="#i-campus"/></svg>Campus</button>
     <button data-go="train"><svg><use href="#i-train"/></svg>Train</button>
     <button data-go="coach"><svg><use href="#i-coach"/></svg>Coach</button>
@@ -555,12 +582,12 @@ dialog.tall { min-height: 70dvh; }
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { targets, sum, goalETA, PACES } from './calc.js?v=7';
-import { grab } from './dining.js?v=7';
-import { plan } from './coach.js?v=7';
-import * as sync from './sync.js?v=7';
-import * as F from './foods.js?v=7';
-import * as T from './training.js?v=7';
+import { targets, sum, goalETA, PACES } from './calc.js?v=8';
+import { grab } from './dining.js?v=8';
+import { plan, recommend } from './coach.js?v=8';
+import * as sync from './sync.js?v=8';
+import * as F from './foods.js?v=8';
+import * as T from './training.js?v=8';
 
 const KEY = 'forge:v1';
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -600,6 +627,7 @@ function go(tab) {
   document.querySelectorAll('section[data-tab]').forEach(s => s.classList.toggle('on', s.dataset.tab === tab));
   document.querySelectorAll('nav.tabs button').forEach(b => { b.classList.toggle('on', b.dataset.go === tab); b.setAttribute('aria-current', b.dataset.go === tab ? 'page' : 'false'); });
   scrollTo({ top: 0 });
+  if (tab === 'meals') renderMeals();
 }
 document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.go));
 function shiftDay(d) { const t = new Date(day + 'T12:00'); t.setDate(t.getDate() + d); day = dayKey(t); renderDiary(); }
@@ -998,7 +1026,7 @@ $('#askBtn').onclick = () => {
   $('#coachErr').textContent = '';
   const goal = $('#goalText').value.trim();
   if (!goal) { $('#coachErr').textContent = 'Say or type a goal first.'; return; }
-  renderCoach(plan({ goal, profile: S.profile, eaten: S.log[todayKey()] || [], menu: $('#useCampus').checked ? menuToday() : null, training: trainingInfo() }));
+  renderCoach(plan({ goal: S.profile.prefs ? `${goal}. ${S.profile.prefs}` : goal, profile: S.profile, eaten: S.log[todayKey()] || [], menu: $('#useCampus').checked ? menuToday() : null, training: trainingInfo() }));
   $('#coachResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 let coachFoods = [];
@@ -1023,6 +1051,48 @@ function renderCoach(r) {
   $('#useTargets').onclick = () => { S.profile.calorieGoal = r0(t.calories); save(); renderAll(); toast('Daily goal updated'); };
   $('#coachResult').querySelectorAll('[data-cf]').forEach(b => b.onclick = () => { day = todayKey(); renderDiary(); openAdd(coachFoods[b.dataset.cf]); });
 }
+
+// ---------- meals: what to eat next ----------
+let mealChoice = '', mealOpts = [];
+function todayTargets() {
+  const tg = targets(S.profile), burned = (S.workouts?.[todayKey()] || []).reduce((t, w) => t + (w.calories || 0), 0);
+  return { ...tg, calories: tg.calories + Math.round(burned / 2), burned };
+}
+function renderMeals() {
+  const tg = todayTargets(), eaten = S.log[todayKey()] || [];
+  const r = recommend({ targets: tg, eaten, meal: mealChoice || undefined, menu: menuToday(), myFoods: S.myFoods, recent: S.recentFoods, prefsText: S.profile.prefs || '',
+    training: { plannedToday: T.todaysPlan(S.trainPlan)?.name, doneToday: (S.workouts?.[todayKey()] || []).length > 0 } });
+  mealOpts = r.options;
+  const pct = k => Math.min(100, (r.got[k] / Math.max(1, tg[k])) * 100);
+  const later = r.plannedMeals.map(m => m.toLowerCase()).join(' and ');
+  $('#mealProgress').innerHTML = `<p class="eyebrow" style="margin-bottom:6px">Today so far</p>
+    ${[['Calories', 'calories', '--ember', ''], ['Protein', 'protein', '--pro', 'g'], ['Carbs', 'carbs', '--carb', 'g'], ['Fat', 'fat', '--fat', 'g']].map(([lab, k, c, u]) => `
+      <div class="macro"><div class="top">${lab}<span><b>${r0(r.got[k]).toLocaleString()}</b><small> / ${r0(tg[k]).toLocaleString()}${u}</small></span></div><div class="track-bar"><i style="width:${pct(k)}%;background:var(${c})"></i></div></div>`).join('')}
+    <p class="left-line">${r.left.calories > 0 ? `<b>${r0(r.left.calories).toLocaleString()} kcal</b> and <b>${r0(r.left.protein)} g protein</b> left${later ? ` for ${later}` : ''}. ${r.meal} budget: <b>~${r.budget.toLocaleString()} kcal</b>.` : `You've hit today's calories${tg.burned ? ` (including +${Math.round(tg.burned / 2)} from training)` : ''}.`}</p>`;
+  document.querySelectorAll('[data-mp]').forEach(b => b.classList.toggle('on', b.dataset.mp === mealChoice));
+  $('#mealOptions').innerHTML = r.options.length ? r.options.map((o, oi) => `<div class="opt"><div class="where">${esc(o.where === 'Anywhere' ? 'Make it or grab it' : o.where)}</div><h3>${esc(o.title === o.where ? `${r.meal} at ${o.where}` : o.title)}</h3>
+      <div class="tot"><span><b>${o.totals.calories}</b> kcal</span><span><b>${o.totals.protein}</b>g P</span><span><b>${o.totals.carbs}</b>g C</span><span><b>${o.totals.fat}</b>g F</span></div>
+      ${o.foods.map((f, fi) => `<div class="entry"><div class="grow"><div class="name">${esc(f.name)}</div><div class="sub">${esc(f.portion)} · P${r0(f.protein)} C${r0(f.carbs)} F${r0(f.fat)}</div></div><span class="kcal">${r0(f.calories)}</span>
+        <button class="iconbtn" data-mf="${oi}|${fi}" aria-label="Log ${esc(f.name)}" style="color:var(--ember)">${icon('i-plus', 20)}</button></div>`).join('')}
+      <p class="muted" style="margin:8px 0 10px;font-size:13px">${esc(o.why)}</p>
+      <button class="btn hot block" data-mall="${oi}">Log all to ${r.meal === 'Snacks' ? 'snacks' : r.meal.toLowerCase()}</button></div>`).join('')
+    : '<div class="card"><div class="empty-note">No options fit right now. Try another meal, or loosen your food preferences.</div></div>';
+  $('#mealNotes').innerHTML = r.notes.map(x => `<li>${esc(x)}</li>`).join('');
+  $('#mealNotesCard').classList.toggle('hidden', !r.notes.length);
+  $('#mealOptions').dataset.meal = r.meal;
+  $('#prefsInput').value = S.profile.prefs || '';
+}
+$('#mealPick').onclick = e => { const b = e.target.closest('[data-mp]'); if (b) { mealChoice = b.dataset.mp; renderMeals(); } };
+function logMealFood(f, meal, where) {
+  day = todayKey();
+  addEntry({ name: f.name, portion: f.portion, servings: 1, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat, meal, source: where === 'Anywhere' ? 'Meals' : where });
+}
+$('#mealOptions').onclick = e => {
+  const meal = $('#mealOptions').dataset.meal, one = e.target.closest('[data-mf]'), all = e.target.closest('[data-mall]');
+  if (one) { const [oi, fi] = one.dataset.mf.split('|').map(Number); logMealFood(mealOpts[oi].foods[fi], meal, mealOpts[oi].where); toast(`Logged ${mealOpts[oi].foods[fi].name}`); renderMeals(); }
+  if (all) { const o = mealOpts[+all.dataset.mall]; o.foods.forEach(f => logMealFood(f, meal, o.where)); toast(`Logged ${o.foods.length} items to ${meal}`); mealChoice = ''; renderMeals(); }
+};
+$('#prefsForm').onsubmit = e => { e.preventDefault(); S.profile.prefs = $('#prefsInput').value.trim().slice(0, 300); save(); renderMeals(); toast('Preferences saved'); };
 
 // ---------- training ----------
 const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -1252,7 +1322,7 @@ addEventListener('storage', e => { if (e.key === KEY) { S = load(); renderAll();
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 $('#installHint').textContent = standalone ? '' : dev === 'iphone' ? 'Tip: tap Share → Add to Home Screen to install FORGE.' : dev === 'android' ? 'Tip: tap ⋮ → Add to Home screen to install FORGE.' : '';
 
-function renderAll() { renderDiary(); renderCampus(); renderProfile(); renderTrain(); }
+function renderAll() { renderDiary(); renderCampus(); renderProfile(); renderTrain(); if ($('section[data-tab="meals"]').classList.contains('on')) renderMeals(); }
 renderAll();
 if (new URLSearchParams(location.search).has('import')) { go('campus'); history.replaceState(null, '', location.pathname); }
 else if (!S.profileSet) go('profile');

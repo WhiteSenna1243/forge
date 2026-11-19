@@ -1,5 +1,5 @@
 // Free, offline goal coach: reads a goal sentence, sets daily targets, and builds meals from the campus menu.
-import { targets, sum } from './calc.js?v=7';
+import { targets, sum } from './calc.js?v=8';
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const WORDS = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, eight: 8, ten: 10, twelve: 12 };
@@ -128,20 +128,22 @@ function pickMeal(pool, budget, proteinGoal) {
   return { foods: chosen, cal, pro };
 }
 
-function mealPlan(meal, items, budget, proteinGoal, prefs) {
+// Every place's best meal for this budget, best fit first.
+function rankPlaces(meal, items, budget, proteinGoal, prefs) {
   const pool = (items
-    ? items.filter(i => SERVES[meal].includes(i.period.toLowerCase()))
+    ? items.filter(i => SERVES[meal].includes(String(i.period).toLowerCase()))
     : BASICS.filter(i => i.m.includes(meal[0]))).filter(i => allowed(i, prefs));
-  const byPlace = Map.groupBy ? Map.groupBy(pool, i => i.location) : pool.reduce((m, i) => m.set(i.location, [...(m.get(i.location) || []), i]), new Map());
-  let best = null;
+  const byPlace = pool.reduce((m, i) => m.set(i.location, [...(m.get(i.location) || []), i]), new Map());
+  const out = [];
   for (const [place, list] of byPlace) {
     const r = pickMeal(list, budget, proteinGoal);
     if (!r.foods.length) continue;
     const score = Math.abs(budget - r.cal) / budget + Math.max(0, proteinGoal - r.pro) / Math.max(1, proteinGoal);
-    if (!best || score < best.score) best = { ...r, score, place, period: list[0].period };
+    out.push({ ...r, score, place, period: list[0].period });
   }
-  return best;
+  return out.sort((x, y) => x.score - y.score);
 }
+const mealPlan = (...args) => rankPlaces(...args)[0] || null;
 
 const fmt = n => Math.round(n).toLocaleString('en-US');
 const strip = ({ name, portion, calories, protein, carbs, fat }) => ({ name, portion, calories, protein, carbs, fat });
@@ -220,4 +222,64 @@ export function plan({ goal, profile, eaten = [], menu = null, now = new Date(),
   tips.push('This is general guidance, not medical advice. See a doctor or dietitian if you have a health condition.');
 
   return { summary, dailyTargets: { calories: daily, protein, carbs, fat }, suggestions, tips: tips.slice(0, 7) };
+}
+
+// ---------- next-meal recommendations (Meals tab) ----------
+const sumUp = list => list.reduce((t, f) => ({ calories: t.calories + f.calories, protein: t.protein + f.protein, carbs: t.carbs + (f.carbs || 0), fat: t.fat + (f.fat || 0) }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+const r1 = v => Math.round(v * 10) / 10;
+
+// The next meal to plan for: the first one not logged yet at or after the current time.
+export function nextMealName(eaten, now = new Date()) {
+  const h = now.getHours() + now.getMinutes() / 60;
+  const order = h < 10.5 ? ['Breakfast', 'Lunch', 'Dinner', 'Snacks'] : h < 15 ? ['Lunch', 'Dinner', 'Snacks'] : h < 21 ? ['Dinner', 'Snacks'] : ['Snacks'];
+  return order.find(m => !eaten.some(e => e.meal === m)) || 'Snacks';
+}
+
+// Your own foods and recipes as menu-style items (one portion each).
+function mineAsItems(myFoods = [], recent = []) {
+  const seen = new Set();
+  return [...myFoods, ...recent].filter(f => f?.per100 && f.portions?.length && !seen.has(f.id) && seen.add(f.id)).map(f => {
+    const p = f.portions[0], k = p.grams / 100;
+    return { id: f.id, name: f.name, portion: p.label, location: 'Your foods', period: 'every day', tags: f.tags || [], ingredients: '',
+      calories: Math.round(f.per100.calories * k), protein: r1(f.per100.protein * k), carbs: r1(f.per100.carbs * k), fat: r1(f.per100.fat * k), food: f };
+  });
+}
+
+// targets: today's targets (with workout calories added). eaten: today's diary. menu: today's campus items or null.
+export function recommend({ targets: tg, eaten = [], meal, menu = null, myFoods = [], recent = [], prefsText = '', training = {}, now = new Date() }) {
+  meal ||= nextMealName(eaten, now);
+  const got = sum(eaten);
+  const left = { calories: tg.calories - got.calories, protein: Math.max(0, tg.protein - got.protein), carbs: Math.max(0, tg.carbs - got.carbs), fat: Math.max(0, tg.fat - got.fat) };
+  const h = now.getHours() + now.getMinutes() / 60;
+  const later = (h < 10.5 ? ['Breakfast', 'Lunch', 'Dinner'] : h < 15 ? ['Lunch', 'Dinner'] : h < 21 ? ['Dinner'] : []).filter(m => !eaten.some(e => e.meal === m));
+  const plannedMeals = [...new Set([meal, ...later.filter(m => m !== meal)])].filter(m => m !== 'Snacks' || meal === 'Snacks');
+  const share = plannedMeals.reduce((t, m) => t + MEAL_SHARE[m], 0) || MEAL_SHARE[meal];
+  let budget = Math.round(Math.max(0, left.calories) * (MEAL_SHARE[meal] / share));
+  let proteinGoal = Math.round(left.protein * (MEAL_SHARE[meal] / share));
+  const prefs = parsePrefs(prefsText);
+  const notes = [];
+  if (left.calories < 150) {
+    notes.push(left.calories < 0 ? `You're ${fmt(-left.calories)} kcal over today. If you're hungry, keep it light and high-protein.` : `You're basically at your goal for today. Nice work.`);
+    budget = 200; proteinGoal = Math.max(proteinGoal, 15);
+  }
+  // Working with the workout coach.
+  if (training.plannedToday && !training.doneToday) notes.push(`Training today (${training.plannedToday}): include 30-40 g of carbs and 25+ g of protein in this meal if it's 1-2 hours before you lift.`);
+  if (training.doneToday) notes.push('You trained today, so make protein the center of this meal to recover.');
+  if (left.protein > 0 && proteinGoal >= 40) notes.push(`You still need ${Math.round(left.protein)} g of protein today, so these meals lean protein-heavy.`);
+
+  const options = [];
+  const label = (r, title, why) => {
+    const t = sumUp(r.foods);
+    options.push({ title, where: r.place, foods: r.foods.map(f => ({ name: f.name, portion: f.portion, calories: f.calories, protein: f.protein, carbs: f.carbs || 0, fat: f.fat || 0, food: f.food })),
+      totals: { calories: Math.round(t.calories), protein: Math.round(t.protein), carbs: Math.round(t.carbs), fat: Math.round(t.fat) }, why });
+  };
+  const fitText = r => `${fmt(r.cal)} kcal and ${Math.round(r.pro)} g protein for a ~${fmt(budget)} kcal, ${proteinGoal} g protein ${meal.toLowerCase()} budget.${r.cal < budget * 0.75 ? ` Room for ~${fmt(budget - r.cal)} more kcal: double the protein or add a side.` : ''}`;
+  if (menu?.length) for (const r of rankPlaces(meal, menu, budget, proteinGoal, prefs).slice(0, 2)) label(r, `${r.place}`, fitText(r));
+  const mine = mineAsItems(myFoods, recent).filter(i => allowed(i, { ...prefs, diet: null, tags: new Set() })); // your own foods: only your dislikes apply
+  if (mine.length) { const r = pickMeal(mine, budget, proteinGoal); if (r.foods.length) label({ ...r, place: 'Your foods' }, 'From your foods', fitText(r)); }
+  const basic = rankPlaces(meal, null, budget, proteinGoal, prefs)[0];
+  if (basic) label(basic, 'Quick and easy', fitText(basic));
+  if (!menu?.length) notes.push('Load this week’s campus menu (Campus tab) to get dining hall picks here too.');
+  if (prefs.labels.length) notes.push(`Going by: ${prefs.labels.join(', ')}.`);
+  return { meal, budget, proteinGoal, left, got, plannedMeals, options, notes };
 }
