@@ -19,3 +19,22 @@ test('sum multiplies by servings', () => {
   assert.deepEqual(sum([{ calories: 100, protein: 10, carbs: 5, fat: 2, servings: 2 }, { calories: 50, protein: 0, carbs: 12, fat: 0 }]),
     { calories: 250, protein: 20, carbs: 22, fat: 4 });
 });
+
+test('pace sets the deficit, capped at 1% of body weight a week', async () => {
+  const { targets } = await import('../public/calc.js');
+  const me = { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'lose' };
+  const maint = targets({ ...me, goal: 'maintain' }).calories;
+  assert.equal(targets({ ...me, pace: 0.5 }).calories, maint - 250);
+  assert.equal(targets({ ...me, pace: 2 }).pace, 1.6); // 2 lb/wk asked, 1% of 160 lb allowed
+  assert.equal(targets({ ...me, goal: 'gain', pace: 0.25 }).calories, maint + 125);
+});
+
+test('goalETA gives a date, flags a goal weight in the wrong direction', async () => {
+  const { goalETA } = await import('../public/calc.js');
+  const me = { sex: 'male', age: 20, heightIn: 69, weightLb: 180, activity: 'light', goal: 'lose', pace: 1, goalWeightLb: 170 };
+  const eta = goalETA(me, new Date(2026, 0, 1));
+  assert.equal(eta.weeks, 10);
+  assert.equal(eta.date.getMonth(), 2); // early March
+  assert.deepEqual(goalETA({ ...me, goalWeightLb: 190 }), { mismatch: true });
+  assert.equal(goalETA({ ...me, goal: 'maintain' }), null);
+});

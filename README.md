@@ -56,16 +56,16 @@ Then open http://127.0.0.1:3000.
   - diets (vegetarian, vegan, pescatarian, halal/no pork, gluten-free, dairy-free), allergies ("allergic to peanuts") and dislikes ("hate rice", "no mushrooms or onions"), checked against Dine On Campus's labels and ingredients
 
   It sets daily targets, caps unsafe loss rates, and builds meals for the rest of today from the campus menu.
-- **Profile**: your daily target comes from the Mifflin-St Jeor formula, using your stats, activity and goal. You can override it.
+- **Profile**: set your goal weight and pace (lb/week), and it shows the date you'll get there. Calories come from the Mifflin-St Jeor formula, capped at about 1% of body weight a week and never below 1,500 (men) or 1,200 (women). You can override them.
 
 ## Loading campus menus
 
-Dine On Campus blocks other apps and websites from reading its menus. So the import is a bookmark you tap while you're on the real Dine On Campus site. It reads all 24 locations, which takes about 40 seconds. The Campus tab has step-by-step instructions for computer, iPhone and Android.
+Dine On Campus blocks other apps and websites from reading its menus. So the import is a bookmark you tap while you're on the real Dine On Campus site. It grabs the **next 7 days** for all 24 locations, which takes about a minute, so you only need it about once a week. The Campus tab has step-by-step instructions for computer, iPhone and Android.
 
 - **Computer**: drag the **FORGE import** button to your bookmarks bar. Click it on Dine On Campus, then click **Send to FORGE**.
 - **Phone**: copy the import code into a bookmark. Tap it on Dine On Campus, tap **Copy**, then **Paste menu** in FORGE.
 
-Load the menus again each day. If Dine On Campus changes their site, the import may stop working.
+Load them again about once a week. Past days drop off automatically. If Dine On Campus changes their site, the import may stop working.
 
 ## Tests
 

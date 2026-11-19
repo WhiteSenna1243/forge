@@ -156,6 +156,7 @@ details summary::-webkit-details-marker { display: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chip { flex: none; border: 1px solid var(--line); background: var(--s2); color: var(--muted); border-radius: 999px; padding: 8px 14px; font: 500 14px var(--body); cursor: pointer; white-space: nowrap; }
 .chip:hover { color: var(--ink); border-color: #3a3a40; }
+.chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
 .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; }
 .stat b { display: block; font: 800 24px/1 var(--display); }
@@ -167,6 +168,9 @@ details summary::-webkit-details-marker { display: none; }
 .tips { margin: 0; padding: 0; list-style: none; }
 .tips li { position: relative; padding: 0 0 10px 18px; color: var(--muted); font-size: 15px; }
 .tips li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 7px; border-radius: 2px; background: var(--ember); transform: rotate(45deg); }
+.eta { margin: -4px 0 14px; font-size: 15px; color: var(--muted); }
+.eta b { color: var(--ink); }
+.eta.warn { color: var(--carb); }
 .err { color: var(--over); font-size: 14px; margin-top: 8px; min-height: 0; }
 
 /* ---------- tab bar ---------- */
@@ -285,7 +289,7 @@ dialog[open] { animation: sheet .22s ease-out; }
         <button class="btn hot block" id="pasteImport" style="margin-top:8px">Import</button>
       </div>
       <details id="importHelp" style="margin-top:12px">
-        <summary>How to load today's menus</summary>
+        <summary>How to load this week's menus</summary>
         <div class="seg" role="tablist" aria-label="Device">
           <button class="on" data-dev="desktop" role="tab">Computer</button>
           <button data-dev="iphone" role="tab">iPhone</button>
@@ -294,7 +298,7 @@ dialog[open] { animation: sheet .22s ease-out; }
         <ol class="steps" data-help="desktop">
           <li>Drag this to your bookmarks bar:<br><a class="bm" id="bookmarklet" href="#"><svg width="16" height="16"><use href="#i-flame"/></svg>FORGE import</a></li>
           <li>Open <a href="https://dineoncampus.com/unccharlotte/whats-on-the-menu" target="_blank" rel="noopener" style="color:var(--ink)">Dine On Campus · UNC Charlotte</a>.</li>
-          <li>Click the <strong>FORGE import</strong> bookmark, wait about 40 seconds, then click <strong>Send to FORGE</strong>.</li>
+          <li>Click the <strong>FORGE import</strong> bookmark, wait about a minute (it grabs the whole week), then click <strong>Send to FORGE</strong>.</li>
         </ol>
         <ol class="steps hidden" data-help="iphone">
           <li>Tap <button class="btn sm copybm" style="vertical-align:middle">Copy import code</button></li>
@@ -312,6 +316,7 @@ dialog[open] { animation: sheet .22s ease-out; }
       </details>
     </div>
     <div id="menuCard" class="hidden">
+      <div class="chips" id="menuDays" role="tablist" aria-label="Menu day"></div>
       <div class="grid2">
         <label>Location<select id="locFilter"></select></label>
         <label>Meal<select id="periodFilter"></select></label>
@@ -366,9 +371,12 @@ dialog[open] { animation: sheet .22s ease-out; }
             <option value="moderate">3-5 workouts/wk</option><option value="active">6-7 workouts/wk</option><option value="athlete">Athlete</option>
           </select></label>
           <label>Goal<select name="goal"><option value="lose">Cut (lose)</option><option value="maintain">Maintain</option><option value="gain">Bulk (gain)</option></select></label>
+          <label class="goalOnly">Goal weight lb<input name="goalWeightLb" type="number" inputmode="decimal" min="60" max="600" step="0.1" placeholder="e.g. 165"></label>
+          <label class="goalOnly">Pace<select name="pace"></select></label>
           <label>Calorie goal<input name="calorieGoal" type="number" inputmode="numeric" min="0" max="10000" placeholder="Auto"></label>
         </div>
         <div class="stats" id="targetStats" style="margin-top:0"></div>
+        <p class="eta" id="etaText"></p>
         <button class="btn hot block" type="submit">Save</button>
       </form>
     </div>
@@ -413,7 +421,7 @@ dialog[open] { animation: sheet .22s ease-out; }
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { targets, sum } from './calc.js';
+import { targets, sum, goalETA, PACES } from './calc.js';
 import { grab } from './dining.js';
 import { plan } from './coach.js';
 import * as sync from './sync.js';
@@ -429,12 +437,14 @@ const todayKey = () => dayKey(new Date());
 const icon = (id, size = 18) => `<svg width="${size}" height="${size}" aria-hidden="true"><use href="#${id}"/></svg>`;
 const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
 
-const DEFAULT = { profile: { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'maintain', calorieGoal: 0 }, profileSet: false, log: {}, menu: null };
+const DEFAULT = { profile: { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'maintain', calorieGoal: 0 }, profileSet: false, log: {}, menus: {} };
 function load() {
   let s;
   try { s = { ...structuredClone(DEFAULT), ...JSON.parse(localStorage.getItem(KEY) || localStorage.getItem('ninerfuel:v1') || 'null') }; }
   catch { s = structuredClone(DEFAULT); }
   sync.withIds(s.log);
+  if (s.menu?.items) { s.menus = { ...s.menus, [s.menu.date]: s.menu.items }; delete s.menu; } // older single-day format
+  for (const d of Object.keys(s.menus || {})) if (d < todayKey()) delete s.menus[d]; // drop past days
   return s;
 }
 let S = load();
@@ -534,12 +544,21 @@ document.querySelector(`[data-dev="${dev}"]`).click();
 
 const clean = i => ({ location: String(i.location).slice(0, 80), period: String(i.period).slice(0, 40), station: String(i.station).slice(0, 80),
   name: String(i.name).slice(0, 120), portion: String(i.portion || '').slice(0, 60), calories: n(i.calories), protein: n(i.protein), carbs: n(i.carbs), fat: n(i.fat),
-  tags: Array.isArray(i.tags) ? i.tags.slice(0, 30).map(t => String(t).slice(0, 40)) : [], ingredients: String(i.ingredients || '').slice(0, 400) });
+  tags: Array.isArray(i.tags) ? i.tags.slice(0, 30).map(t => String(t).slice(0, 40)) : [], ingredients: String(i.ingredients || '').slice(0, 160) });
+const isDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d);
 function importMenus(data) {
-  if (data?.type !== 'forge-menus' || !Array.isArray(data.items)) return false;
-  const items = data.items.slice(0, 8000).filter(i => i && typeof i === 'object').map(clean);
-  S.menu = { date: /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : todayKey(), items, at: Date.now() };
-  save(); renderCampus(); go('campus'); toast(`Loaded ${items.length} menu items`);
+  if (data?.type !== 'forge-menus') return false;
+  const days = data.days && typeof data.days === 'object' ? data.days : Array.isArray(data.items) ? { [data.date]: data.items } : null;
+  if (!days) return false;
+  let count = 0;
+  for (const [d, list] of Object.entries(days).slice(0, 14)) {
+    if (!isDate(d) || d < todayKey() || !Array.isArray(list)) continue;
+    S.menus[d] = list.slice(0, 8000).filter(i => i && typeof i === 'object').map(clean);
+    count++;
+  }
+  if (!count) return false;
+  menuDay = todayKey();
+  save(); renderCampus(); go('campus'); toast(`Loaded menus for ${count} day${count === 1 ? '' : 's'}`);
   return true;
 }
 addEventListener('message', e => {
@@ -556,11 +575,17 @@ $('#pasteBtn').onclick = async () => {
 };
 $('#pasteImport').onclick = () => importText($('#pasteText').value);
 
-const menuToday = () => S.menu?.date === todayKey() ? S.menu.items : null;
+const menuToday = () => S.menus?.[todayKey()] || null;
+let menuDay = todayKey();
+const shortDay = d => d === todayKey() ? 'Today' : new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' });
 function renderCampus() {
-  const items = S.menu?.items || [], fresh = !!menuToday();
-  $('#menuStatus').innerHTML = !S.menu ? '<span class="status-dot"></span>No menu loaded yet' :
-    `<span class="status-dot ${fresh ? 'live' : ''}"></span>${items.length} items · ${new Date(S.menu.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}${fresh ? '' : ' · old, reload for today'}`;
+  const dates = Object.keys(S.menus || {}).filter(d => d >= todayKey()).sort();
+  if (!dates.includes(menuDay)) menuDay = dates[0] || todayKey();
+  const items = S.menus?.[menuDay] || [], fresh = !!menuToday();
+  const last = dates[dates.length - 1];
+  $('#menuStatus').innerHTML = !dates.length ? '<span class="status-dot"></span>No menus loaded' :
+    `<span class="status-dot ${fresh ? 'live' : ''}"></span>${fresh ? 'Menus' : 'Today missing · menus'} through ${new Date(last + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`;
+  $('#menuDays').innerHTML = dates.map(d => `<button class="chip${d === menuDay ? ' on' : ''}" data-day="${d}">${shortDay(d)}</button>`).join('');
   $('#importHelp').open = !fresh;
   $('#menuCard').classList.toggle('hidden', !items.length);
   $('#useCampus').disabled = !fresh;
@@ -572,7 +597,7 @@ function renderCampus() {
 }
 function renderMenuList() {
   const loc = $('#locFilter').value, per = $('#periodFilter').value, q = $('#menuSearch').value.trim().toLowerCase();
-  const items = (S.menu?.items || []).map((it, idx) => ({ it, idx }))
+  const items = (S.menus?.[menuDay] || []).map((it, idx) => ({ it, idx }))
     .filter(({ it }) => (!loc || it.location === loc) && (!per || it.period === per) && (!q || it.name.toLowerCase().includes(q) || it.station.toLowerCase().includes(q)));
   let last = '';
   $('#menuList').innerHTML = items.slice(0, 300).map(({ it, idx }) => {
@@ -585,7 +610,8 @@ function renderMenuList() {
 }
 ['#locFilter', '#periodFilter'].forEach(s => $(s).onchange = renderMenuList);
 $('#menuSearch').oninput = renderMenuList;
-function pickFood(el) { const it = S.menu.items[el.dataset.food]; openAdd({ ...it, meal: mealFor(it.period), source: it.location }); }
+$('#menuDays').onclick = e => { const b = e.target.closest('[data-day]'); if (b) { menuDay = b.dataset.day; renderCampus(); } };
+function pickFood(el) { const it = S.menus[menuDay][el.dataset.food]; openAdd({ ...it, meal: mealFor(it.period), source: it.location }); }
 $('#menuList').onclick = e => { const el = e.target.closest('[data-food]'); if (el) pickFood(el); };
 $('#menuList').onkeydown = e => { const el = e.target.closest('[data-food]'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickFood(el); } };
 
@@ -636,21 +662,43 @@ function renderCoach(r) {
 
 // ---------- profile & backup ----------
 const pf = $('#profileForm');
+const paceLabel = (goal, v) => `${v} lb/week${goal === 'lose' ? ({ 0.5: ' · easy', 1: ' · steady', 1.5: ' · hard', 2: ' · aggressive' }[v] || '') : ({ 0.25: ' · lean', 0.5: ' · steady', 0.75: ' · fast' }[v] || '')}`;
+function fillPace(goal, value) {
+  const list = PACES[goal] || [];
+  pf.pace.innerHTML = list.map(v => `<option value="${v}">${paceLabel(goal, v)}</option>`).join('');
+  pf.pace.value = list.includes(Number(value)) ? value : (goal === 'lose' ? 1 : 0.5);
+  pf.querySelectorAll('.goalOnly').forEach(el => el.classList.toggle('hidden', goal === 'maintain'));
+}
+const readProfile = () => {
+  const f = Object.fromEntries(new FormData(pf));
+  return { sex: f.sex, age: n(f.age), heightIn: n(f.ft) * 12 + n(f.inch), weightLb: n(f.weightLb), activity: f.activity, goal: f.goal,
+    goalWeightLb: n(f.goalWeightLb), pace: n(f.pace), calorieGoal: n(f.calorieGoal) };
+};
+function renderTargets(p) {
+  const t = targets(p);
+  $('#targetStats').innerHTML = `<div class="stat kcal"><b>${t.calories.toLocaleString()}</b><span>Kcal</span></div><div class="stat"><b>${t.protein}</b><span>Protein</span></div>
+    <div class="stat"><b>${t.carbs}</b><span>Carbs</span></div><div class="stat"><b>${t.fat}</b><span>Fat</span></div>`;
+  const eta = goalETA(p), el = $('#etaText');
+  el.className = 'eta';
+  if (p.goal === 'maintain') el.textContent = `Maintenance is about ${t.maintenance.toLocaleString()} kcal a day.`;
+  else if (eta?.mismatch) { el.classList.add('warn'); el.textContent = `Your goal weight is ${p.goal === 'lose' ? 'above' : 'below'} your current weight. Switch Goal to ${p.goal === 'lose' ? 'Bulk' : 'Cut'}?`; }
+  else if (eta) el.innerHTML = `Hit <b>${p.goalWeightLb} lb</b> around <b>${eta.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: eta.date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}</b>, ${eta.weeks} weeks at ${eta.pace} lb/week.${p.pace > eta.pace && !p.calorieGoal ? ' Capped for safety.' : ''}`;
+  else el.textContent = p.calorieGoal ? '' : `${t.pace} lb/week from ~${t.maintenance.toLocaleString()} kcal maintenance. Add a goal weight to see your date.`;
+}
+pf.addEventListener('input', () => { fillPace(pf.goal.value, pf.pace.value); renderTargets(readProfile()); });
 function renderProfile() {
   const p = S.profile;
   pf.sex.value = p.sex; pf.age.value = p.age; pf.ft.value = Math.floor(p.heightIn / 12); pf.inch.value = r0(p.heightIn % 12);
   pf.weightLb.value = p.weightLb; pf.activity.value = p.activity; pf.goal.value = p.goal; pf.calorieGoal.value = p.calorieGoal || '';
-  const t = targets(p);
-  $('#targetStats').innerHTML = `<div class="stat kcal"><b>${t.calories.toLocaleString()}</b><span>Kcal</span></div><div class="stat"><b>${t.protein}</b><span>Protein</span></div>
-    <div class="stat"><b>${t.carbs}</b><span>Carbs</span></div><div class="stat"><b>${t.fat}</b><span>Fat</span></div>`;
+  pf.goalWeightLb.value = p.goalWeightLb || ''; fillPace(p.goal, p.pace);
+  renderTargets(p);
   $('#profileEyebrow').textContent = S.profileSet ? 'You' : 'Step 1';
   $('#profileTitle').textContent = S.profileSet ? 'Profile' : 'Set up your numbers';
 }
 pf.onsubmit = e => {
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(pf));
   const first = !S.profileSet;
-  S.profile = { sex: f.sex, age: n(f.age), heightIn: n(f.ft) * 12 + n(f.inch), weightLb: n(f.weightLb), activity: f.activity, goal: f.goal, calorieGoal: n(f.calorieGoal) };
+  S.profile = readProfile();
   S.profileSet = true;
   save(); renderAll(); toast('Saved');
   if (first) go('diary');
@@ -664,7 +712,7 @@ $('#importFile').onchange = async e => {
     const d = JSON.parse(await e.target.files[0].text());
     if (!d.profile || typeof d.log !== 'object') throw 0;
     if (!confirm('Replace everything on this device with the backup?')) return;
-    S = { ...structuredClone(DEFAULT), ...d, profileSet: true, syncedUser: S.syncedUser, syncedAt: S.syncedAt, menu: S.menu }; sync.withIds(S.log); save(); renderAll(); toast('Backup restored');
+    S = { ...structuredClone(DEFAULT), ...d, profileSet: true, syncedUser: S.syncedUser, syncedAt: S.syncedAt, menus: S.menus }; sync.withIds(S.log); save(); renderAll(); toast('Backup restored');
   } catch { toast('That file isn’t a FORGE backup.'); }
   e.target.value = '';
 };
@@ -752,13 +800,13 @@ $('#accountBtn').onclick = async () => {
   if (!user) { S.localOnly = false; persist(); showAuth(true); return; }
   if (!confirm(S.dirty ? 'Some changes haven’t synced yet and will be lost. Log out anyway?' : 'Log out? Your diary stays saved in your account.')) return;
   await db.auth.signOut().catch(() => {});
-  S = { ...structuredClone(DEFAULT), menu: S.menu }; persist(); renderAll(); // clear this device so the next person starts fresh
+  S = { ...structuredClone(DEFAULT), menus: S.menus }; persist(); renderAll(); // clear this device so the next person starts fresh
 };
 $('#deleteCloud').onclick = async () => {
   if (!confirm('Permanently delete your diary and profile from your account and this device? This can’t be undone.')) return;
   try { await sync.deleteMine(db, user.id); } catch { toast('Couldn’t delete. Check your connection and try again.'); return; }
   await db.auth.signOut().catch(() => {});
-  S = { ...structuredClone(DEFAULT), menu: S.menu }; persist(); renderAll(); toast('Your data was deleted');
+  S = { ...structuredClone(DEFAULT), menus: S.menus }; persist(); renderAll(); toast('Your data was deleted');
 };
 addEventListener('online', scheduleSync);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(); });
