@@ -65,7 +65,9 @@ Dine On Campus blocks other apps and websites from reading its menus. So the imp
 - **Computer**: drag the **FORGE import** button to your bookmarks bar. Click it on Dine On Campus, then click **Send to FORGE**.
 - **Phone**: copy the import code into a bookmark. Tap it on Dine On Campus, tap **Copy**, then **Paste menu** in FORGE.
 
-Load them again about once a week. Past days drop off automatically. If Dine On Campus changes their site, the import may stop working.
+Load them again about once a week. Past days drop off automatically.
+
+**Shared menus:** when you're logged in, an import is saved to the `menus` table in Supabase and downloaded by everyone else who's logged in. So only one person in the group needs to run the import each week. If Dine On Campus changes their site, the import may stop working.
 
 ## Tests
 

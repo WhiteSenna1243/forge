@@ -60,3 +60,11 @@ test("a new account on a phone that still holds someone else's diary starts empt
   assert.deepEqual(r.next.log, {});
   assert.equal(r.next.profileSet, false);
 });
+
+test('staleDays downloads only missing or newer shared menus', async () => {
+  const { staleDays } = await import('../public/sync.js');
+  const rows = [{ date: 'd1', updated_at: '2026-11-19T10:00Z' }, { date: 'd2', updated_at: '2026-11-19T10:00Z' }, { date: 'd3', updated_at: '2026-11-19T12:00Z' }];
+  const have = { d1: '2026-11-19T10:00Z', d3: '2026-11-19T09:00Z' };
+  const local = { d1: [{}], d3: [{}] };
+  assert.deepEqual(staleDays(rows, have, local), ['d2', 'd3']);
+});

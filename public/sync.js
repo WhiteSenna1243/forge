@@ -80,3 +80,34 @@ export function reconcile(local, remote, userId) {
   if (remoteChanged) return { next: adopt(local, remote), upload: false };
   return { next: local, upload: !!local.dirty };
 }
+
+// ---------- shared campus menus (one row per day, readable by every signed-in user) ----------
+export async function menuStamps(db, fromDate) {
+  const { data, error } = await db.from('menus').select('date, updated_at').gte('date', fromDate);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function menuDays(db, dates) {
+  if (!dates.length) return [];
+  const { data, error } = await db.from('menus').select('date, items, updated_at').in('date', dates);
+  if (error) throw error;
+  return data || [];
+}
+
+// Upload one day at a time (each is a few hundred KB), then clear out days that have passed.
+export async function shareMenus(db, days, yesterday) {
+  const stamps = {};
+  for (const [date, items] of Object.entries(days)) {
+    const updated_at = new Date().toISOString();
+    const { error } = await db.from('menus').upsert({ date, items, updated_at }, { onConflict: 'date' });
+    if (error) throw error;
+    stamps[date] = updated_at;
+  }
+  await db.from('menus').delete().lt('date', yesterday);
+  return stamps;
+}
+
+// Which shared days this device should download: ones it lacks or has an older copy of.
+export const staleDays = (rows, have, local) =>
+  rows.filter(r => !local[r.date] || !have[r.date] || r.updated_at > have[r.date]).map(r => r.date);

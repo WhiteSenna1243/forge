@@ -16,3 +16,19 @@ create policy "delete own data" on public.user_data for delete to authenticated 
 
 -- Newer Supabase projects do not expose new tables automatically; let signed-in users reach it (the policies above still limit them to their own row).
 grant select, insert, update, delete on public.user_data to authenticated;
+
+-- Shared campus menus: one row per day. Any signed-in user can read them, and anyone who runs the
+-- weekly import updates them for the whole group. Only near-term days can be written; old days can be cleaned up.
+create table if not exists public.menus (
+  date date primary key,
+  items jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid default auth.uid() references auth.users (id) on delete set null,
+  constraint menu_size check (pg_column_size(items) < 1500000)
+);
+alter table public.menus enable row level security;
+create policy "read menus" on public.menus for select to authenticated using (true);
+create policy "add menus" on public.menus for insert to authenticated with check (date between current_date - 1 and current_date + 14);
+create policy "update menus" on public.menus for update to authenticated using (true) with check (date between current_date - 1 and current_date + 14);
+create policy "clean old menus" on public.menus for delete to authenticated using (date < current_date - 1);
+grant select, insert, update, delete on public.menus to authenticated;

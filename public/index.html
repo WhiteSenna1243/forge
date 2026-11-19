@@ -290,6 +290,7 @@ dialog[open] { animation: sheet .22s ease-out; }
       </div>
       <details id="importHelp" style="margin-top:12px">
         <summary>How to load this week's menus</summary>
+        <p class="muted" style="margin:10px 0 0">Logged in? Only one person needs to do this about once a week. Their import is shared with everyone logged in to FORGE.</p>
         <div class="seg" role="tablist" aria-label="Device">
           <button class="on" data-dev="desktop" role="tab">Computer</button>
           <button data-dev="iphone" role="tab">iPhone</button>
@@ -437,7 +438,7 @@ const todayKey = () => dayKey(new Date());
 const icon = (id, size = 18) => `<svg width="${size}" height="${size}" aria-hidden="true"><use href="#${id}"/></svg>`;
 const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
 
-const DEFAULT = { profile: { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'maintain', calorieGoal: 0 }, profileSet: false, log: {}, menus: {} };
+const DEFAULT = { profile: { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'maintain', calorieGoal: 0 }, profileSet: false, log: {}, menus: {}, menuStamps: {} };
 function load() {
   let s;
   try { s = { ...structuredClone(DEFAULT), ...JSON.parse(localStorage.getItem(KEY) || localStorage.getItem('ninerfuel:v1') || 'null') }; }
@@ -550,16 +551,40 @@ function importMenus(data) {
   if (data?.type !== 'forge-menus') return false;
   const days = data.days && typeof data.days === 'object' ? data.days : Array.isArray(data.items) ? { [data.date]: data.items } : null;
   if (!days) return false;
-  let count = 0;
+  const fresh = {};
   for (const [d, list] of Object.entries(days).slice(0, 14)) {
-    if (!isDate(d) || d < todayKey() || !Array.isArray(list)) continue;
-    S.menus[d] = list.slice(0, 8000).filter(i => i && typeof i === 'object').map(clean);
-    count++;
+    if (!isDate(d) || d < todayKey() || !Array.isArray(list) || !list.length) continue;
+    fresh[d] = S.menus[d] = list.slice(0, 8000).filter(i => i && typeof i === 'object').map(clean);
   }
+  const count = Object.keys(fresh).length;
   if (!count) return false;
   menuDay = todayKey();
-  save(); renderCampus(); go('campus'); toast(`Loaded menus for ${count} day${count === 1 ? '' : 's'}`);
+  persist(); renderCampus(); go('campus'); toast(`Loaded menus for ${count} day${count === 1 ? '' : 's'}`);
+  if (db && user) shareWeek(fresh);
   return true;
+}
+// Share an import with everyone in the group, and pick up imports other people shared.
+async function shareWeek(days) {
+  try {
+    const yesterday = dayKey(new Date(Date.now() - 864e5));
+    Object.assign(S.menuStamps ||= {}, await sync.shareMenus(db, days, yesterday));
+    persist(); renderCampus(); toast('Menus shared with everyone in FORGE');
+  } catch { toast('Menus saved on this phone, but sharing failed. Check your connection.'); }
+}
+let menusCheckedAt = 0;
+async function refreshMenus(force) {
+  if (!db || !user || (!force && Date.now() - menusCheckedAt < 10 * 60e3)) return;
+  menusCheckedAt = Date.now();
+  try {
+    const rows = await sync.menuStamps(db, todayKey());
+    const want = sync.staleDays(rows, S.menuStamps || {}, S.menus || {});
+    for (const r of await sync.menuDays(db, want)) {
+      if (!Array.isArray(r.items)) continue;
+      S.menus[r.date] = r.items.slice(0, 8000).filter(i => i && typeof i === 'object').map(clean);
+      (S.menuStamps ||= {})[r.date] = r.updated_at;
+    }
+    if (want.length) { persist(); renderCampus(); }
+  } catch { /* offline: keep what's on the phone */ }
 }
 addEventListener('message', e => {
   if (e.origin !== 'https://dineoncampus.com') return;
@@ -584,7 +609,7 @@ function renderCampus() {
   const items = S.menus?.[menuDay] || [], fresh = !!menuToday();
   const last = dates[dates.length - 1];
   $('#menuStatus').innerHTML = !dates.length ? '<span class="status-dot"></span>No menus loaded' :
-    `<span class="status-dot ${fresh ? 'live' : ''}"></span>${fresh ? 'Menus' : 'Today missing · menus'} through ${new Date(last + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`;
+    `<span class="status-dot ${fresh ? 'live' : ''}"></span>${fresh ? 'Menus' : 'Today missing · menus'} through ${new Date(last + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}${user ? ' · shared' : ''}`;
   $('#menuDays').innerHTML = dates.map(d => `<button class="chip${d === menuDay ? ' on' : ''}" data-day="${d}">${shortDay(d)}</button>`).join('');
   $('#importHelp').open = !fresh;
   $('#menuCard').classList.toggle('hidden', !items.length);
@@ -763,7 +788,7 @@ function setUser(u) {
   user = u || null;
   renderAccount();
   showAuth(!user && !S.localOnly);
-  if (user && changed) runSync();
+  if (user && changed) { runSync(); refreshMenus(true); }
 }
 let authMode = 'in';
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
@@ -809,7 +834,7 @@ $('#deleteCloud').onclick = async () => {
   S = { ...structuredClone(DEFAULT), menus: S.menus }; persist(); renderAll(); toast('Your data was deleted');
 };
 addEventListener('online', scheduleSync);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { scheduleSync(); refreshMenus(); } });
 if (sync.enabled) {
   if (!sync.hasSavedLogin() && !S.localOnly) showAuth(true); // show login before the library finishes loading
   sync.client().then(async c => {
