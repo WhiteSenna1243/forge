@@ -3,7 +3,8 @@
 A free calorie tracker for UNC Charlotte students. Log food, hit your calories and macros, plan meals with a coach you can talk to, and pull in today's dining hall menus from Dine On Campus.
 
 - **Works on phones**: open the link, then Add to Home Screen. It runs like an app and works offline.
-- **Private**: each person's diary is saved only on their own device. No accounts, no server, no costs.
+- **Accounts (optional)**: log in to back up your diary and sync it across devices, or tap "Use without an account" to keep everything on the phone only.
+- **Private**: each person can only ever see their own data (enforced by the database's row-level security).
 - **No AI bills**: the coach runs on rules in the browser.
 
 ## Live
@@ -28,6 +29,12 @@ The app is just the files in `public/`. Any static host works. The easiest is Ne
 To update the app later, drag the `public` folder onto the site's **Deploys** page.
 
 GitHub Pages or Cloudflare Pages work too: upload the contents of `public/`.
+
+## Accounts (Supabase)
+
+Logins and synced diaries live in a free Supabase project. `public/config.js` holds its URL and public "anon" key, which are meant to be public. The database rules in [supabase.sql](supabase.sql) are what keep data private. To set up a new project, run that script in Supabase's SQL Editor and turn off **Authentication → Sign In / Providers → Confirm email**, because the free plan only sends about 2 emails an hour.
+
+Free projects pause after a week with no activity. Opening the dashboard wakes them up.
 
 ## Run it on your computer
 
