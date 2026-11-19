@@ -192,11 +192,15 @@ dialog[open] { animation: sheet .22s ease-out; }
   font: 600 15px var(--body); padding: 11px 18px; border-radius: 14px; opacity: 0; pointer-events: none; transition: .2s; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 .hidden { display: none !important; }
-/* Netlify's free-plan badge sits in the bottom-right corner; lift the tab bar above it instead of hiding it. */
-body.host-badge { --badge: 66px; padding-bottom: calc(var(--tabbar) + var(--badge) + env(safe-area-inset-bottom) + 12px); }
-body.host-badge nav.tabs { bottom: var(--badge); border-bottom: 1px solid var(--line); }
-body.host-badge::after { content: ""; position: fixed; z-index: 9; left: 0; right: 0; bottom: 0; height: var(--badge); background: var(--bg); }
-body.host-badge #toast { bottom: calc(var(--tabbar) + var(--badge) + env(safe-area-inset-bottom) + 14px); }
+/* ---------- login ---------- */
+.auth { position: fixed; inset: 0; z-index: 30; background: var(--bg); overflow-y: auto; display: flex; align-items: center; justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 24px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+.auth::before { content: ""; position: absolute; inset: 0 0 auto; height: 360px; pointer-events: none; background: radial-gradient(60% 70% at 50% 0%, rgba(255, 90, 31, .18), transparent 70%); }
+.auth-card { position: relative; width: 100%; max-width: 400px; }
+.auth .brand { justify-content: center; font-size: 52px; letter-spacing: 3px; margin-bottom: 6px; }
+.auth .brand svg { width: 46px; height: 46px; }
+.auth .tag { text-align: center; color: var(--muted); margin: 0 0 22px; font-size: 16px; }
+.note { color: var(--ok); font-size: 14px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -216,6 +220,24 @@ body.host-badge #toast { bottom: calc(var(--tabbar) + var(--badge) + env(safe-ar
     <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   </defs>
 </svg>
+
+<div id="authView" class="auth hidden" role="dialog" aria-modal="true" aria-labelledby="authBrand">
+  <div class="auth-card">
+    <h1 class="brand" id="authBrand"><svg aria-hidden="true"><use href="#i-flame"/></svg>FORGE</h1>
+    <p class="tag">Log in to keep your diary safe and synced on all your devices.</p>
+    <div class="seg" role="tablist" aria-label="Log in or sign up">
+      <button class="on" data-mode="in" role="tab">Log in</button>
+      <button data-mode="up" role="tab">Sign up</button>
+    </div>
+    <form id="authForm" class="card">
+      <label>Email<input name="email" type="email" autocomplete="email" inputmode="email" required></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" minlength="6" required></label>
+      <button class="btn hot block" type="submit" id="authBtn">Log in</button>
+      <div class="err" id="authErr" role="alert"></div>
+    </form>
+    <button class="btn ghost block" id="skipAuth">Use without an account</button>
+  </div>
+</div>
 
 <header>
   <div class="bar">
@@ -324,6 +346,11 @@ body.host-badge #toast { bottom: calc(var(--tabbar) + var(--badge) + env(safe-ar
 
   <!-- PROFILE -->
   <section data-tab="profile">
+    <div class="card hidden" id="accountCard">
+      <div class="row between"><div class="grow"><p class="eyebrow" style="margin:0 0 2px">Account</p><div id="accountText" style="overflow:hidden;text-overflow:ellipsis"></div></div>
+      <button class="btn sm" id="accountBtn">Log in</button></div>
+      <div class="muted" id="syncText" style="margin-top:6px;font-size:13px"></div>
+    </div>
     <p class="eyebrow" id="profileEyebrow">You</p>
     <h2 id="profileTitle">Profile</h2>
     <div class="card">
@@ -347,8 +374,9 @@ body.host-badge #toast { bottom: calc(var(--tabbar) + var(--badge) + env(safe-ar
     </div>
     <div class="card">
       <h3 class="eyebrow" style="margin-bottom:4px">Your data</h3>
-      <p class="muted" style="margin-top:0">Saved only on this device. Nobody else, including whoever shared this app with you, can see it. Export a backup now and then.</p>
+      <p class="muted" style="margin-top:0" id="dataText">Saved only on this device. Nobody else, including whoever shared this app with you, can see it. Export a backup now and then.</p>
       <div class="row"><button class="btn sm" id="exportBtn">Export backup</button><label class="btn sm" style="margin:0">Import backup<input type="file" id="importFile" accept="application/json" hidden></label></div>
+      <button class="btn sm ghost hidden" id="deleteCloud" style="margin-top:10px;color:var(--over)">Delete my account data</button>
     </div>
     <p class="muted" style="text-align:center;margin-top:18px" id="installHint"></p>
   </section>
@@ -388,6 +416,7 @@ body.host-badge #toast { bottom: calc(var(--tabbar) + var(--badge) + env(safe-ar
 import { targets, sum } from './calc.js';
 import { grab } from './dining.js';
 import { plan } from './coach.js';
+import * as sync from './sync.js';
 
 const KEY = 'forge:v1';
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -402,11 +431,16 @@ const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
 
 const DEFAULT = { profile: { sex: 'male', age: 20, heightIn: 69, weightLb: 160, activity: 'light', goal: 'maintain', calorieGoal: 0 }, profileSet: false, log: {}, menu: null };
 function load() {
-  try { return { ...structuredClone(DEFAULT), ...JSON.parse(localStorage.getItem(KEY) || localStorage.getItem('ninerfuel:v1') || 'null') }; }
-  catch { return structuredClone(DEFAULT); }
+  let s;
+  try { s = { ...structuredClone(DEFAULT), ...JSON.parse(localStorage.getItem(KEY) || localStorage.getItem('ninerfuel:v1') || 'null') }; }
+  catch { s = structuredClone(DEFAULT); }
+  sync.withIds(s.log);
+  return s;
 }
 let S = load();
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast('Couldn’t save. Storage is full or blocked.'); } }
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast('Couldn’t save. Storage is full or blocked.'); } }
+// Every change saves on the device right away, then uploads to the account shortly after.
+function save() { S.updatedAt = Date.now(); S.dirty = true; persist(); scheduleSync(); }
 let day = todayKey();
 
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600); }
@@ -457,7 +491,7 @@ $('#meals').onclick = e => {
 };
 function addEntry(food) {
   (S.log[day] ||= []).push({
-    meal: MEALS.includes(food.meal) ? food.meal : mealNow(), name: String(food.name).slice(0, 120), portion: String(food.portion || '').slice(0, 60),
+    id: sync.newId(), meal: MEALS.includes(food.meal) ? food.meal : mealNow(), name: String(food.name).slice(0, 120), portion: String(food.portion || '').slice(0, 60),
     servings: n(food.servings) || 1, calories: n(food.calories), protein: n(food.protein), carbs: n(food.carbs), fat: n(food.fat), source: String(food.source || '').slice(0, 60),
   });
   save(); renderDiary();
@@ -630,7 +664,7 @@ $('#importFile').onchange = async e => {
     const d = JSON.parse(await e.target.files[0].text());
     if (!d.profile || typeof d.log !== 'object') throw 0;
     if (!confirm('Replace everything on this device with the backup?')) return;
-    S = { ...structuredClone(DEFAULT), ...d, profileSet: true }; save(); renderAll(); toast('Backup restored');
+    S = { ...structuredClone(DEFAULT), ...d, profileSet: true, syncedUser: S.syncedUser, syncedAt: S.syncedAt, menu: S.menu }; sync.withIds(S.log); save(); renderAll(); toast('Backup restored');
   } catch { toast('That file isn’t a FORGE backup.'); }
   e.target.value = '';
 };
@@ -643,9 +677,100 @@ function renderAll() { renderDiary(); renderCampus(); renderProfile(); }
 renderAll();
 if (new URLSearchParams(location.search).has('import')) { go('campus'); history.replaceState(null, '', location.pathname); }
 else if (!S.profileSet) go('profile');
-const badgeCheck = () => document.body.classList.toggle('host-badge', !!document.getElementById('nl-badge-frame'));
-new MutationObserver(badgeCheck).observe(document.body, { childList: true });
-badgeCheck();
+
+// ---------- accounts & sync ----------
+let db = null, user = null, syncing = false, again = false, syncTimer;
+const setSync = t => { $('#syncText').textContent = t; };
+function scheduleSync() { clearTimeout(syncTimer); syncTimer = setTimeout(runSync, 1200); }
+async function runSync() {
+  if (!db || !user) return;
+  if (syncing) { again = true; return; }
+  syncing = true; setSync('Syncing…');
+  try {
+    const remote = await sync.pull(db, user.id);
+    const { next, upload } = sync.reconcile(S, remote, user.id);
+    S = next;
+    const stamp = S.updatedAt;
+    if (upload) await sync.push(db, user.id, S);
+    S.syncedUser = user.id; S.syncedAt = S.updatedAt;
+    if (S.updatedAt === stamp) S.dirty = false; else again = true; // edited while uploading
+    persist(); renderAll(); setSync(`Synced ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+    if (!S.profileSet && $('#authView').classList.contains('hidden')) go('profile');
+  } catch { setSync(navigator.onLine ? 'Couldn’t sync. Will retry.' : 'Offline. Changes will sync when you’re back online.'); }
+  syncing = false;
+  if (again) { again = false; scheduleSync(); }
+}
+function showAuth(on) { $('#authView').classList.toggle('hidden', !on); if (on) setTimeout(() => $('#authForm').email.focus(), 50); }
+function renderAccount() {
+  if (!sync.enabled) return;
+  $('#accountCard').classList.remove('hidden');
+  $('#accountText').textContent = user ? user.email : 'Not logged in';
+  $('#accountBtn').textContent = user ? 'Log out' : 'Log in';
+  $('#deleteCloud').classList.toggle('hidden', !user);
+  $('#dataText').textContent = user ? 'Saved to your account and on this device. Only you can see it.' : 'Saved only on this device. Log in to back it up and use it on other devices.';
+  if (!user) setSync('');
+}
+function setUser(u) {
+  const changed = (u?.id || null) !== (user?.id || null);
+  user = u || null;
+  renderAccount();
+  showAuth(!user && !S.localOnly);
+  if (user && changed) runSync();
+}
+let authMode = 'in';
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+  authMode = b.dataset.mode;
+  document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
+  $('#authBtn').textContent = authMode === 'in' ? 'Log in' : 'Create account';
+  $('#authForm').password.autocomplete = authMode === 'in' ? 'current-password' : 'new-password';
+  $('#authErr').textContent = '';
+});
+function authError(m = '') {
+  if (/invalid login/i.test(m)) return 'Wrong email or password.';
+  if (/already registered|already exists/i.test(m)) return 'That email already has an account. Log in instead.';
+  if (/password/i.test(m) && /6|short|least/i.test(m)) return 'Password needs at least 6 characters.';
+  if (/rate|too many/i.test(m)) return 'Too many tries. Wait a minute and try again.';
+  if (/fetch|network/i.test(m)) return 'No connection. Check your internet and try again.';
+  return m || 'Something went wrong. Try again.';
+}
+$('#authForm').onsubmit = async e => {
+  e.preventDefault();
+  if (!db) { $('#authErr').textContent = 'Can’t reach the login service. Check your connection.'; return; }
+  const { email, password } = Object.fromEntries(new FormData(e.target));
+  const btn = $('#authBtn'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = authMode === 'in' ? 'Logging in…' : 'Creating…'; $('#authErr').textContent = '';
+  try {
+    const { data, error } = authMode === 'in' ? await db.auth.signInWithPassword({ email, password }) : await db.auth.signUp({ email, password });
+    if (error) throw error;
+    if (!data.session) $('#authErr').innerHTML = '<span class="note">Check your email to confirm your account, then log in.</span>';
+    else { S.localOnly = false; persist(); e.target.reset(); toast(authMode === 'in' ? 'Welcome back' : 'Account created'); }
+  } catch (err) { $('#authErr').textContent = authError(err.message); }
+  btn.disabled = false; btn.textContent = label;
+};
+$('#skipAuth').onclick = () => { S.localOnly = true; persist(); showAuth(false); if (!S.profileSet) go('profile'); };
+$('#accountBtn').onclick = async () => {
+  if (!user) { S.localOnly = false; persist(); showAuth(true); return; }
+  if (!confirm(S.dirty ? 'Some changes haven’t synced yet and will be lost. Log out anyway?' : 'Log out? Your diary stays saved in your account.')) return;
+  await db.auth.signOut().catch(() => {});
+  S = { ...structuredClone(DEFAULT), menu: S.menu }; persist(); renderAll(); // clear this device so the next person starts fresh
+};
+$('#deleteCloud').onclick = async () => {
+  if (!confirm('Permanently delete your diary and profile from your account and this device? This can’t be undone.')) return;
+  try { await sync.deleteMine(db, user.id); } catch { toast('Couldn’t delete. Check your connection and try again.'); return; }
+  await db.auth.signOut().catch(() => {});
+  S = { ...structuredClone(DEFAULT), menu: S.menu }; persist(); renderAll(); toast('Your data was deleted');
+};
+addEventListener('online', scheduleSync);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleSync(); });
+if (sync.enabled) {
+  if (!sync.hasSavedLogin() && !S.localOnly) showAuth(true); // show login before the library finishes loading
+  sync.client().then(async c => {
+    db = c;
+    const { data } = await db.auth.getSession();
+    setUser(data.session?.user);
+    db.auth.onAuthStateChange((_event, session) => setUser(session?.user));
+  }).catch(() => { showAuth(false); setSync('Offline. Using this device only for now.'); renderAccount(); });
+}
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
