@@ -103,3 +103,31 @@ test('nutrition coach listens to the workout plan', () => {
   assert.match(r.tips[0], /Training day \(Push\)/);
   assert.ok(r.tips.some(t => /burned about 300/.test(t)));
 });
+
+test('recommend sizes the next meal from what is left today', async () => {
+  const { recommend, nextMealName } = await import('../public/coach.js');
+  const tg = { calories: 2200, protein: 170, carbs: 220, fat: 60 };
+  const eaten = [{ meal: 'Breakfast', calories: 500, protein: 30, carbs: 60, fat: 15, servings: 1 }];
+  const noon = new Date(2026, 10, 19, 12, 0);
+  assert.equal(nextMealName(eaten, noon), 'Lunch');
+  const menu = [
+    { location: 'SoVi', period: 'Lunch', station: 'Grill', name: 'Grilled Chicken', portion: '4 oz', calories: 180, protein: 33, carbs: 0, fat: 4, tags: ['Poultry'] },
+    { location: 'SoVi', period: 'Lunch', station: 'Sides', name: 'Brown Rice', portion: '1 cup', calories: 220, protein: 5, carbs: 45, fat: 2, tags: ['Vegan', 'Vegetarian'] },
+    { location: 'SoVi', period: 'Lunch', station: 'Sides', name: 'Steamed Broccoli', portion: '1 cup', calories: 50, protein: 4, carbs: 10, fat: 0, tags: ['Vegan', 'Vegetarian'] },
+    { location: 'SoVi', period: 'Dinner', station: 'Grill', name: 'Steak', portion: '6 oz', calories: 400, protein: 45, carbs: 0, fat: 24, tags: ['Beef'] },
+  ];
+  const mine = [{ id: 'm1', name: 'Protein oats', kind: 'recipe', per100: { calories: 150, protein: 12, carbs: 20, fat: 3 }, portions: [{ label: '1 serving (250 g)', grams: 250 }] }];
+  const r = recommend({ targets: tg, eaten, menu, myFoods: mine, now: noon, training: { plannedToday: 'Push' } });
+  assert.equal(r.meal, 'Lunch');
+  assert.equal(r.budget, Math.round(1700 * 0.35 / 0.75)); // lunch's share of what's left for lunch + dinner
+  assert.equal(r.options[0].where, 'SoVi');
+  assert.ok(r.options[0].foods.some(f => f.name === 'Grilled Chicken'));
+  assert.ok(!r.options[0].foods.some(f => f.name === 'Steak')); // dinner-only item
+  assert.ok(r.options.some(o => o.title === 'From your foods' && o.foods[0].name === 'Protein oats'));
+  assert.ok(r.options.some(o => o.title === 'Quick and easy'));
+  assert.ok(r.notes.some(n => /Training today \(Push\)/.test(n)));
+  const veg = recommend({ targets: tg, eaten, menu, now: noon, prefsText: 'vegetarian' });
+  assert.ok(!veg.options[0].foods.some(f => f.name === 'Grilled Chicken'));
+  const full = recommend({ targets: tg, eaten: [{ meal: 'Lunch', calories: 2300, protein: 170, carbs: 200, fat: 80, servings: 1 }], now: noon });
+  assert.ok(full.notes[0].includes('over today'));
+});

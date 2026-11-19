@@ -1,7 +1,7 @@
 // Account sync with Supabase. Each user has one row holding their diary as JSON; row-level security
 // in the database lets people read and write only their own row. The app keeps working offline:
 // changes save on the device first and upload when there's a connection.
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=7';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js?v=8';
 
 export const enabled = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
