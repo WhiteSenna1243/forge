@@ -110,18 +110,30 @@ export async function byBarcode(code) {
   throw new Error('No product found for that barcode. You can enter it from the label instead.');
 }
 
+// Remember searches for a day: both databases rate-limit, and campus Wi-Fi shares one address.
+const CACHE_KEY = 'forge:foodcache';
+function cached(q) { try { const hit = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')[q]; return hit && Date.now() - hit.t < 864e5 ? hit.r : null; } catch { return null; } }
+function remember(q, r) {
+  try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); c[q] = { t: Date.now(), r: r.slice(0, 30) }; const keys = Object.keys(c); if (keys.length > 40) delete c[keys[0]]; localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch { /* storage full or blocked */ }
+}
+
 // Search both sources at once; USDA first for plain foods, store products after.
 export async function searchAll(query) {
+  const key = query.trim().toLowerCase(), hit = cached(key);
+  if (hit) return { results: hit, errors: [] };
   const [usda, off] = await Promise.allSettled([searchUSDA(query), searchOFF(query)]);
   const order = { lab: 0, survey: 1, label: 2, community: 3 };
   const results = [...(usda.value || []), ...(off.value || [])];
   const seen = new Set();
-  return {
+  const out = {
     results: results
       .filter(f => { const key = `${f.name}|${f.brand}`.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; })
       .sort((a, b) => order[a.kind] - order[b.kind]),
-    errors: [usda, off].filter(x => x.status === 'rejected').map(x => x.reason?.message || 'Search failed'),
+    errors: [[usda, 'USDA'], [off, 'Store products']].filter(([x]) => x.status === 'rejected')
+      .map(([x, name]) => /failed to fetch|load failed|networkerror/i.test(x.reason?.message || '') ? `${name} search is busy or you're offline. Try again in a minute${name === 'Store products' ? ', or scan the barcode' : ''}.` : x.reason?.message || `${name} search failed`),
   };
+  if (!out.errors.length && out.results.length) remember(key, out.results);
+  return out;
 }
 
 // A recipe's nutrition per serving, from ingredients [{ food, grams }].
